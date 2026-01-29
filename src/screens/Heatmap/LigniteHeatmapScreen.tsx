@@ -259,17 +259,17 @@ const LigniteHeatmapScreen = () => {
               <FontAwesome5 name="search-minus" size={16} color="#fff" />
             </TouchableOpacity>
           </View>
-          <ScrollView style={styles.heatmapScrollContainer}>
-            <View style={styles.heatmapHeader}>
-              <Text style={styles.heatmapTitle}>
+        <ScrollView style={styles.heatmapScrollContainer}>
+          <View style={styles.heatmapHeader}>
+            <Text style={styles.heatmapTitle}>
                 Lignite Generation (MW)
-              </Text>
-              <Text style={styles.heatmapSubtitle}>
-                {selectedDate} • {dataType === 'realtime' ? 'Realtime Data' : (version === 'first' ? 'First Version' : 'Current Version')}
-              </Text>
-            </View>
-            
-            <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+            </Text>
+            <Text style={styles.heatmapSubtitle}>
+              {selectedDate} • {dataType === 'realtime' ? 'Realtime Data' : (version === 'first' ? 'First Version' : 'Current Version')}
+            </Text>
+          </View>
+          
+          <ScrollView horizontal showsHorizontalScrollIndicator={true}>
               <View style={[styles.heatmapGrid, {transform: [{scale: zoomLevel}], transformOrigin: 'top left'}]}>
               {/* Header row with plant names */}
               <View style={styles.headerRow}>
@@ -307,7 +307,7 @@ const LigniteHeatmapScreen = () => {
               })}
             </View>
           </ScrollView>
-          </ScrollView>
+    </ScrollView>
         </View>
       ) : (
         <View style={styles.emptyContainer}>

@@ -143,39 +143,39 @@ const ImportCoalHeatmapScreen = () => {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.versionControl}>
-            <Text style={styles.label}>Version</Text>
-            <View style={styles.versionButtons}>
-              <TouchableOpacity
-                style={[
-                  styles.versionButton,
-                  version === 'first' && styles.versionButtonActive,
-                ]}
-                onPress={() => setVersion('first')}>
-                <Text
+            <View style={styles.versionControl}>
+              <Text style={styles.label}>Version</Text>
+              <View style={styles.versionButtons}>
+                <TouchableOpacity
                   style={[
-                    styles.versionButtonText,
-                    version === 'first' && styles.versionButtonTextActive,
-                  ]}>
-                  First
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.versionButton,
-                  version === 'current' && styles.versionButtonActive,
-                ]}
-                onPress={() => setVersion('current')}>
-                <Text
+                    styles.versionButton,
+                    version === 'first' && styles.versionButtonActive,
+                  ]}
+                  onPress={() => setVersion('first')}>
+                  <Text
+                    style={[
+                      styles.versionButtonText,
+                      version === 'first' && styles.versionButtonTextActive,
+                    ]}>
+                    First
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
                   style={[
-                    styles.versionButtonText,
-                    version === 'current' && styles.versionButtonTextActive,
-                  ]}>
-                  Current
-                </Text>
-              </TouchableOpacity>
+                    styles.versionButton,
+                    version === 'current' && styles.versionButtonActive,
+                  ]}
+                  onPress={() => setVersion('current')}>
+                  <Text
+                    style={[
+                      styles.versionButtonText,
+                      version === 'current' && styles.versionButtonTextActive,
+                    ]}>
+                    Current
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
         </View>
       </View>
 
@@ -207,17 +207,17 @@ const ImportCoalHeatmapScreen = () => {
               <FontAwesome5 name="search-minus" size={16} color="#fff" />
             </TouchableOpacity>
           </View>
-          <ScrollView style={styles.heatmapScrollContainer}>
-            <View style={styles.heatmapHeader}>
-              <Text style={styles.heatmapTitle}>
+        <ScrollView style={styles.heatmapScrollContainer}>
+          <View style={styles.heatmapHeader}>
+            <Text style={styles.heatmapTitle}>
                 Import Coal Generation (MW)
-              </Text>
-              <Text style={styles.heatmapSubtitle}>
+            </Text>
+            <Text style={styles.heatmapSubtitle}>
                 {selectedDate} • {version === 'first' ? 'First Version' : 'Current Version'}
-              </Text>
-            </View>
-            
-            <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+            </Text>
+          </View>
+          
+          <ScrollView horizontal showsHorizontalScrollIndicator={true}>
               <View style={[styles.heatmapGrid, {transform: [{scale: zoomLevel}], transformOrigin: 'top left'}]}>
               {/* Header row with plant names */}
               <View style={styles.headerRow}>
@@ -255,7 +255,7 @@ const ImportCoalHeatmapScreen = () => {
               })}
             </View>
           </ScrollView>
-          </ScrollView>
+    </ScrollView>
         </View>
       ) : (
         <View style={styles.emptyContainer}>
