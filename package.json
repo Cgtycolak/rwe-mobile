@@ -4,6 +4,7 @@
   "main": "serve.js",
   "scripts": {
     "start": "node serve.js",
+    "build": "npx expo export --platform web --output-dir web-build",
     "dev": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
