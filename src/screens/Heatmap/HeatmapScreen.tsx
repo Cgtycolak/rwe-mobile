@@ -9,16 +9,6 @@ import {
   Alert,
   Modal,
 } from 'react-native';
-import Animated, {
-  useAnimatedGestureHandler,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
-import {
-  PinchGestureHandler,
-  PinchGestureHandlerGestureEvent,
-} from 'react-native-gesture-handler';
 import apiService from '../../services/apiService';
 import {format, subDays} from 'date-fns';
 
@@ -32,33 +22,6 @@ const HeatmapScreen = () => {
   const [version, setVersion] = useState<'first' | 'current'>('current');
   const [heatmapData, setHeatmapData] = useState<any>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const baseScale = useSharedValue(1);
-  const pinchScale = useSharedValue(1);
-
-  const animatedHeatmapStyle = useAnimatedStyle(() => ({
-    transform: [{scale: pinchScale.value}],
-  }));
-
-  const onPinchGesture = useAnimatedGestureHandler<
-    PinchGestureHandlerGestureEvent,
-    {startScale: number}
-  >({
-    onStart: (_, ctx) => {
-      ctx.startScale = baseScale.value;
-    },
-    onActive: (event, ctx) => {
-      const next = ctx.startScale * event.scale;
-      // Clamp between 0.5x and 3x
-      pinchScale.value = Math.min(Math.max(next, 0.5), 3);
-    },
-    onEnd: () => {
-      // Gently snap very small zoom back up a bit
-      if (pinchScale.value < 0.75) {
-        pinchScale.value = withTiming(0.75, {duration: 150});
-      }
-      baseScale.value = pinchScale.value;
-    },
-  });
 
   // Generate date options - exclude today for realtime data
   const dateOptions = Array.from({length: 181}, (_, i) => {
@@ -271,64 +234,55 @@ const HeatmapScreen = () => {
           <Text style={styles.loadingText}>Loading heatmap...</Text>
         </View>
       ) : heatmapData ? (
-        <View style={{flex: 1}}>
-          <ScrollView style={styles.heatmapScrollContainer}>
-            <View style={styles.heatmapHeader}>
-              <Text style={styles.heatmapTitle}>
-                Natural Gas Generation (MW)
-              </Text>
-              <Text style={styles.heatmapSubtitle}>
-                {selectedDate} •{' '}
-                {dataType === 'realtime'
-                  ? 'Realtime Data'
-                  : version === 'first'
-                  ? 'First Version'
-                  : 'Current Version'}
-              </Text>
-            </View>
-
-            <ScrollView horizontal showsHorizontalScrollIndicator={true}>
-              <PinchGestureHandler onGestureEvent={onPinchGesture}>
-                <Animated.View style={[styles.heatmapGrid, animatedHeatmapStyle]}>
-                {/* Header row with plant names */}
-                <View style={styles.headerRow}>
-                  <View style={styles.hourHeaderCell}>
-                    <Text style={styles.headerText}>Hour</Text>
-                  </View>
-                  {heatmapData.plants?.map((plant: string, idx: number) => (
-                    <View key={idx} style={styles.plantCell}>
-                      <Text style={styles.headerText} numberOfLines={3}>
-                        {plant.split('--')[0]}
-                      </Text>
-                      <Text style={styles.capacityText}>
-                        {plant.split('--')[1]}
+        <ScrollView style={styles.heatmapScrollContainer}>
+          <View style={styles.heatmapHeader}>
+            <Text style={styles.heatmapTitle}>
+              Natural Gas Generation (MW)
+            </Text>
+            <Text style={styles.heatmapSubtitle}>
+              {selectedDate} • {dataType === 'realtime' ? 'Realtime Data' : (version === 'first' ? 'First Version' : 'Current Version')}
+            </Text>
+          </View>
+          
+          <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+            <View style={styles.heatmapGrid}>
+              {/* Header row with plant names */}
+              <View style={styles.headerRow}>
+                <View style={styles.hourHeaderCell}>
+                  <Text style={styles.headerText}>Hour</Text>
+                </View>
+                {heatmapData.plants?.map((plant: string, idx: number) => (
+                  <View key={idx} style={styles.plantCell}>
+                    <Text style={styles.headerText} numberOfLines={3}>
+                      {plant.split('--')[0]}
+                    </Text>
+                    <Text style={styles.capacityText}>
+                      {plant.split('--')[1]}
         </Text>
       </View>
-                  ))}
-                </View>
+                ))}
+              </View>
 
-                {/* Data rows */}
-                {heatmapData.hours?.map((hour: string, hourIdx: number) => {
-                  const rowValues = heatmapData.values[hourIdx] || [];
-                  const maxValue = Math.max(...rowValues.filter((v: number) => v > 0), 1);
-                  return (
-                    <View key={hourIdx} style={styles.dataRow}>
-                      <View style={styles.hourDataCell}>
-                        <Text style={styles.hourText}>{hour}</Text>
-                      </View>
-                      {rowValues.map((value: number, plantIdx: number) => (
-                        <View key={plantIdx}>
-                          {renderHeatmapCell(value, maxValue)}
-                        </View>
-                      ))}
+              {/* Data rows */}
+              {heatmapData.hours?.map((hour: string, hourIdx: number) => {
+                const rowValues = heatmapData.values[hourIdx] || [];
+                const maxValue = Math.max(...rowValues.filter((v: number) => v > 0), 1);
+                return (
+                  <View key={hourIdx} style={styles.dataRow}>
+                    <View style={styles.hourDataCell}>
+                      <Text style={styles.hourText}>{hour}</Text>
                     </View>
-                  );
-                })}
-              </Animated.View>
-              </PinchGestureHandler>
-            </ScrollView>
+                    {rowValues.map((value: number, plantIdx: number) => (
+                      <View key={plantIdx}>
+                        {renderHeatmapCell(value, maxValue)}
+                      </View>
+                    ))}
+                  </View>
+                );
+              })}
+            </View>
+          </ScrollView>
     </ScrollView>
-        </View>
       ) : (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No data available</Text>
