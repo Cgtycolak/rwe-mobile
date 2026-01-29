@@ -1,13 +1,14 @@
 {
   "name": "rweexpo",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "serve.js",
   "scripts": {
-    "start": "expo start",
+    "start": "node serve.js",
+    "dev": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "build:web": "expo export:web",
+    "build:web": "npx expo export --platform web --output-dir web-build",
     "serve": "node serve.js"
   },
   "dependencies": {
