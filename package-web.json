@@ -1,0 +1,10 @@
+{
+  "name": "rwe-mobile-web",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "serve dist -l $PORT"
+  },
+  "dependencies": {
+    "serve": "^14.2.1"
+  }
+}
