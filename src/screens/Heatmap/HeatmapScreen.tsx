@@ -90,8 +90,8 @@ const HeatmapScreen = () => {
       textColor = intensity > 0.5 ? '#fff' : '#2c3e50';
     }
     
-    return (
-      <View style={[styles.heatmapCell, {backgroundColor, flex: 1, marginRight: 2, borderRadius: 4}]}>
+  return (
+      <View style={[styles.heatmapCell, {backgroundColor}]}>
         <Text style={[styles.cellText, {color: textColor}]}>
           {value.toFixed(0)}
         </Text>
@@ -139,7 +139,7 @@ const HeatmapScreen = () => {
                   </Text>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
+    </ScrollView>
           </View>
         </TouchableOpacity>
       </Modal>
@@ -493,9 +493,10 @@ const styles = StyleSheet.create({
     borderRightColor: '#34495e',
   },
   heatmapCell: {
-    padding: 4,
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 6,
   },
   cellText: {
     fontSize: 11,

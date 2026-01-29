@@ -1,11 +1,5 @@
-import React, {useState} from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-} from 'react-native';
+import React from 'react';
+import {View, Text, StyleSheet, ScrollView} from 'react-native';
 
 interface ZoomableHeatmapProps {
   heatmapData: any;
@@ -20,74 +14,37 @@ const ZoomableHeatmap: React.FC<ZoomableHeatmapProps> = ({
   title,
   subtitle,
 }) => {
-  const [zoomLevel, setZoomLevel] = useState<'small' | 'medium' | 'large'>('medium');
-
-  const cellSizes = {
-    small: {width: 60, height: 30, fontSize: 10},
-    medium: {width: 80, height: 35, fontSize: 11},
-    large: {width: 110, height: 45, fontSize: 13},
-  };
-
-  const currentSize = cellSizes[zoomLevel];
-
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.subtitle}>{subtitle}</Text>
-        </View>
-        
-        <View style={styles.zoomControls}>
-          <TouchableOpacity
-            style={[styles.zoomButton, zoomLevel === 'small' && styles.zoomButtonActive]}
-            onPress={() => setZoomLevel('small')}>
-            <Text style={[styles.zoomButtonText, zoomLevel === 'small' && styles.zoomButtonTextActive]}>
-              S
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.zoomButton, zoomLevel === 'medium' && styles.zoomButtonActive]}
-            onPress={() => setZoomLevel('medium')}>
-            <Text style={[styles.zoomButtonText, zoomLevel === 'medium' && styles.zoomButtonTextActive]}>
-              M
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.zoomButton, zoomLevel === 'large' && styles.zoomButtonActive]}
-            onPress={() => setZoomLevel('large')}>
-            <Text style={[styles.zoomButtonText, zoomLevel === 'large' && styles.zoomButtonTextActive]}>
-              L
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.subtitle}>{subtitle}</Text>
       </View>
 
       <ScrollView 
         style={styles.verticalScroll}
         showsVerticalScrollIndicator={true}
-        bounces={false}>
+        bounces={false}
+        pinchGestureEnabled={true}
+        maximumZoomScale={3}
+        minimumZoomScale={0.5}>
         <ScrollView 
           horizontal 
           showsHorizontalScrollIndicator={true}
-          bounces={false}>
+          bounces={false}
+          pinchGestureEnabled={true}>
           <View style={styles.heatmapGrid}>
             {/* Header row with plant names */}
             <View style={styles.headerRow}>
-              <View style={[styles.hourHeaderCell, {width: 50, height: currentSize.height + 25}]}>
+              <View style={styles.hourHeaderCell}>
                 <Text style={styles.headerText}>Hour</Text>
               </View>
               {heatmapData.plants?.map((plant: string, idx: number) => (
-                <View 
-                  key={idx} 
-                  style={[
-                    styles.plantCell, 
-                    {width: currentSize.width, height: currentSize.height + 25}
-                  ]}>
-                  <Text style={[styles.headerText, {fontSize: currentSize.fontSize}]} numberOfLines={3}>
+                <View key={idx} style={styles.plantCell}>
+                  <Text style={styles.headerText} numberOfLines={2}>
                     {plant.split('--')[0]}
                   </Text>
-                  <Text style={[styles.capacityText, {fontSize: currentSize.fontSize - 2}]}>
+                  <Text style={styles.capacityText}>
                     {plant.split('--')[1]}
                   </Text>
                 </View>
@@ -100,13 +57,11 @@ const ZoomableHeatmap: React.FC<ZoomableHeatmapProps> = ({
               const maxValue = Math.max(...rowValues.filter((v: number) => v > 0), 1);
               return (
                 <View key={hourIndex} style={styles.dataRow}>
-                  <View style={[styles.hourDataCell, {width: 50, height: currentSize.height}]}>
+                  <View style={styles.hourDataCell}>
                     <Text style={styles.hourText}>{hour}</Text>
                   </View>
                   {rowValues.map((value: number, plantIndex: number) => (
-                    <View 
-                      key={plantIndex}
-                      style={{width: currentSize.width, height: currentSize.height}}>
+                    <View key={plantIndex} style={styles.cellContainer}>
                       {renderCell(value, maxValue)}
                     </View>
                   ))}
@@ -119,7 +74,7 @@ const ZoomableHeatmap: React.FC<ZoomableHeatmapProps> = ({
 
       <View style={styles.instructions}>
         <Text style={styles.instructionText}>
-          💡 Use S/M/L buttons to adjust cell size • Scroll horizontally and vertically
+          💡 Scroll horizontally & vertically • Pinch to zoom (mobile)
         </Text>
       </View>
     </View>
@@ -132,53 +87,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     paddingHorizontal: 15,
-    paddingVertical: 10,
+    paddingVertical: 12,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
-  titleContainer: {
-    flex: 1,
-  },
   title: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#2c3e50',
   },
   subtitle: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#7f8c8d',
-    marginTop: 2,
-  },
-  zoomControls: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  zoomButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#d0d0d0',
-  },
-  zoomButtonActive: {
-    backgroundColor: '#3498db',
-    borderColor: '#3498db',
-  },
-  zoomButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#7f8c8d',
-  },
-  zoomButtonTextActive: {
-    color: '#fff',
+    marginTop: 4,
   },
   verticalScroll: {
     flex: 1,
@@ -188,48 +111,61 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: 'row',
-    marginBottom: 2,
+    marginBottom: 3,
   },
   hourHeaderCell: {
+    width: 70,
+    height: 70,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#34495e',
-    marginRight: 2,
-    borderRadius: 4,
+    marginRight: 3,
+    borderRadius: 6,
   },
   plantCell: {
+    width: 95,
+    height: 70,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#34495e',
-    marginRight: 2,
-    padding: 4,
-    borderRadius: 4,
+    marginRight: 3,
+    padding: 6,
+    borderRadius: 6,
   },
   headerText: {
     color: '#fff',
     fontWeight: 'bold',
+    fontSize: 11,
     textAlign: 'center',
   },
   capacityText: {
     color: '#ecf0f1',
-    marginTop: 2,
+    fontSize: 10,
+    marginTop: 3,
     textAlign: 'center',
   },
   dataRow: {
     flexDirection: 'row',
-    marginBottom: 2,
+    marginBottom: 3,
   },
   hourDataCell: {
+    width: 70,
+    height: 42,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#34495e',
-    marginRight: 2,
-    borderRadius: 4,
+    marginRight: 3,
+    borderRadius: 6,
   },
   hourText: {
     color: '#fff',
     fontWeight: '600',
-    fontSize: 12,
+    fontSize: 13,
+  },
+  cellContainer: {
+    width: 95,
+    height: 42,
+    marginRight: 3,
   },
   instructions: {
     padding: 12,
