@@ -26,6 +26,7 @@
     "react-native-screens": "~4.16.0"
   },
   "devDependencies": {
+    "@expo/webpack-config": "~22.0.3",
     "@types/react": "~19.1.0",
     "babel-preset-expo": "^54.0.9",
     "typescript": "~5.9.2"
