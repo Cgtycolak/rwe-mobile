@@ -8,11 +8,11 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
-  FlatList,
+  Dimensions,
 } from 'react-native';
+import {FontAwesome5} from '@expo/vector-icons';
 import apiService from '../../services/apiService';
 import {format, subDays} from 'date-fns';
-import ZoomableHeatmap from '../../components/ZoomableHeatmap';
 
 const ImportCoalHeatmapScreen = () => {
   // Import Coal with DPP only (no realtime)
@@ -23,6 +23,7 @@ const ImportCoalHeatmapScreen = () => {
   const [version, setVersion] = useState<'first' | 'current'>('current');
   const [heatmapData, setHeatmapData] = useState<any>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
 
   // Generate date options (today + last 180 days = ~6 months)
   const dateOptions = Array.from({length: 181}, (_, i) => {
@@ -184,12 +185,78 @@ const ImportCoalHeatmapScreen = () => {
           <Text style={styles.loadingText}>Loading heatmap...</Text>
         </View>
       ) : heatmapData ? (
-        <ZoomableHeatmap
-          heatmapData={heatmapData}
-          renderCell={renderHeatmapCell}
-          title="Import Coal Generation (MW)"
-          subtitle={`${selectedDate} • ${version === 'first' ? 'First Version' : 'Current Version'}`}
-        />
+        <View style={{flex: 1}}>
+          <View style={styles.zoomControls}>
+            <TouchableOpacity style={styles.zoomButton} onPress={() => setZoomLevel(1)}>
+              <FontAwesome5 name="compress" size={16} color="#fff" />
+              <Text style={styles.zoomButtonText}>Fit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.zoomButton, zoomLevel === 1 && styles.zoomButtonActive]} onPress={() => setZoomLevel(1)}>
+              <Text style={styles.zoomButtonText}>100%</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.zoomButton, zoomLevel === 1.5 && styles.zoomButtonActive]} onPress={() => setZoomLevel(1.5)}>
+              <Text style={styles.zoomButtonText}>150%</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.zoomButton, zoomLevel === 2 && styles.zoomButtonActive]} onPress={() => setZoomLevel(2)}>
+              <Text style={styles.zoomButtonText}>200%</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.zoomButton} onPress={() => setZoomLevel(Math.min(zoomLevel + 0.5, 3))}>
+              <FontAwesome5 name="search-plus" size={16} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.zoomButton} onPress={() => setZoomLevel(Math.max(zoomLevel - 0.5, 0.5))}>
+              <FontAwesome5 name="search-minus" size={16} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.heatmapScrollContainer}>
+            <View style={styles.heatmapHeader}>
+              <Text style={styles.heatmapTitle}>
+                Import Coal Generation (MW)
+              </Text>
+              <Text style={styles.heatmapSubtitle}>
+                {selectedDate} • {version === 'first' ? 'First Version' : 'Current Version'}
+              </Text>
+            </View>
+            
+            <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+              <View style={[styles.heatmapGrid, {transform: [{scale: zoomLevel}], transformOrigin: 'top left'}]}>
+              {/* Header row with plant names */}
+              <View style={styles.headerRow}>
+                <View style={styles.hourHeaderCell}>
+                  <Text style={styles.headerText}>Hour</Text>
+                </View>
+                {heatmapData.plants?.map((plant: string, idx: number) => (
+                  <View key={idx} style={styles.plantCell}>
+                    <Text style={styles.headerText} numberOfLines={3}>
+                      {plant.split('--')[0]}
+                    </Text>
+                    <Text style={styles.capacityText}>
+                      {plant.split('--')[1]}
+        </Text>
+      </View>
+                ))}
+              </View>
+
+              {/* Data rows */}
+              {heatmapData.hours?.map((hour: string, hourIdx: number) => {
+                const rowValues = heatmapData.values[hourIdx] || [];
+                const maxValue = Math.max(...rowValues.filter((v: number) => v > 0), 1);
+                return (
+                  <View key={hourIdx} style={styles.dataRow}>
+                    <View style={styles.hourDataCell}>
+                      <Text style={styles.hourText}>{hour}</Text>
+                    </View>
+                    {rowValues.map((value: number, plantIdx: number) => (
+                      <View key={plantIdx}>
+                        {renderHeatmapCell(value, maxValue)}
+                      </View>
+                    ))}
+                  </View>
+                );
+              })}
+            </View>
+          </ScrollView>
+          </ScrollView>
+        </View>
       ) : (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No data available</Text>
@@ -481,6 +548,33 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: '#7f8c8d',
+  },
+  zoomControls: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#2c3e50',
+    padding: 8,
+    gap: 8,
+    borderBottomWidth: 2,
+    borderBottomColor: '#34495e',
+  },
+  zoomButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#34495e',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 4,
+  },
+  zoomButtonActive: {
+    backgroundColor: '#3498db',
+  },
+  zoomButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
 
