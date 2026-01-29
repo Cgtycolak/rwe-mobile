@@ -8,9 +8,11 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  FlatList,
 } from 'react-native';
 import apiService from '../../services/apiService';
 import {format, subDays} from 'date-fns';
+import ZoomableHeatmap from '../../components/ZoomableHeatmap';
 
 const HydroHeatmapScreen = () => {
   // Hydro with DPP and Realtime data
@@ -234,55 +236,12 @@ const HydroHeatmapScreen = () => {
           <Text style={styles.loadingText}>Loading heatmap...</Text>
         </View>
       ) : heatmapData ? (
-        <ScrollView style={styles.heatmapScrollContainer}>
-          <View style={styles.heatmapHeader}>
-            <Text style={styles.heatmapTitle}>
-              Hydro Generation (MW)
-            </Text>
-            <Text style={styles.heatmapSubtitle}>
-              {selectedDate} • {dataType === 'realtime' ? 'Realtime Data' : (version === 'first' ? 'First Version' : 'Current Version')}
-            </Text>
-          </View>
-          
-          <ScrollView horizontal showsHorizontalScrollIndicator={true}>
-            <View style={styles.heatmapGrid}>
-              {/* Header row with plant names */}
-              <View style={styles.headerRow}>
-                <View style={styles.hourHeaderCell}>
-                  <Text style={styles.headerText}>Hour</Text>
-                </View>
-                {heatmapData.plants?.map((plant: string, idx: number) => (
-                  <View key={idx} style={styles.plantCell}>
-                    <Text style={styles.headerText} numberOfLines={3}>
-                      {plant.split('--')[0]}
-                    </Text>
-                    <Text style={styles.capacityText}>
-                      {plant.split('--')[1]}
-        </Text>
-      </View>
-                ))}
-              </View>
-
-              {/* Data rows */}
-              {heatmapData.hours?.map((hour: string, hourIdx: number) => {
-                const rowValues = heatmapData.values[hourIdx] || [];
-                const maxValue = Math.max(...rowValues.filter((v: number) => v > 0), 1);
-                return (
-                  <View key={hourIdx} style={styles.dataRow}>
-                    <View style={styles.hourDataCell}>
-                      <Text style={styles.hourText}>{hour}</Text>
-                    </View>
-                    {rowValues.map((value: number, plantIdx: number) => (
-                      <View key={plantIdx}>
-                        {renderHeatmapCell(value, maxValue)}
-                      </View>
-                    ))}
-                  </View>
-                );
-              })}
-            </View>
-          </ScrollView>
-    </ScrollView>
+        <ZoomableHeatmap
+          heatmapData={heatmapData}
+          renderCell={renderHeatmapCell}
+          title="Hydro Generation (MW)"
+          subtitle={`${selectedDate} • ${dataType === 'realtime' ? 'Realtime Data' : (version === 'first' ? 'First Version' : 'Current Version')}`}
+        />
       ) : (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No data available</Text>
