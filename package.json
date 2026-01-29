@@ -1,7 +1,7 @@
 {
   "name": "rweexpo",
   "version": "1.0.0",
-  "main": "serve.js",
+  "main": "index.ts",
   "scripts": {
     "start": "node serve.js",
     "build": "npx expo export --platform web --output-dir web-build",
