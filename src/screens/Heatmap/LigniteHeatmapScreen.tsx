@@ -91,7 +91,7 @@ const LigniteHeatmapScreen = () => {
     }
     
     return (
-      <View style={[styles.heatmapCell, {backgroundColor}]}>
+      <View style={[styles.heatmapCell, {backgroundColor, flex: 1, marginRight: 2, borderRadius: 4}]}>
         <Text style={[styles.cellText, {color: textColor}]}>
           {value.toFixed(0)}
         </Text>

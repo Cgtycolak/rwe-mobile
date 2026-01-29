@@ -1,14 +1,11 @@
-import React, {useState, useRef} from 'react';
+import React, {useState} from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  Animated,
-  PanResponder,
-  Dimensions,
+  ScrollView,
+  TouchableOpacity,
 } from 'react-native';
-
-const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
 
 interface ZoomableHeatmapProps {
   heatmapData: any;
@@ -23,165 +20,106 @@ const ZoomableHeatmap: React.FC<ZoomableHeatmapProps> = ({
   title,
   subtitle,
 }) => {
-  const [scale, setScale] = useState(1);
-  const scaleValue = useRef(new Animated.Value(1)).current;
-  const translateX = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(0)).current;
+  const [zoomLevel, setZoomLevel] = useState<'small' | 'medium' | 'large'>('medium');
 
-  const lastScale = useRef(1);
-  const lastTranslateX = useRef(0);
-  const lastTranslateY = useRef(0);
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        // Store current values
-        lastScale.current = scale;
-        lastTranslateX.current = translateX._value;
-        lastTranslateY.current = translateY._value;
-      },
-      onPanResponderMove: (evt, gestureState) => {
-        const touches = evt.nativeEvent.touches;
-
-        if (touches.length === 2) {
-          // Pinch to zoom
-          const touch1 = touches[0];
-          const touch2 = touches[1];
-
-          const distance = Math.sqrt(
-            Math.pow(touch2.pageX - touch1.pageX, 2) +
-              Math.pow(touch2.pageY - touch1.pageY, 2),
-          );
-
-          if (lastScale.current) {
-            const newScale = Math.max(
-              1,
-              Math.min(lastScale.current * (distance / 200), 4),
-            );
-            scaleValue.setValue(newScale);
-            setScale(newScale);
-          }
-        } else if (touches.length === 1) {
-          // Pan with one finger (only if zoomed in)
-          if (scale > 1) {
-            const maxTranslateX = (SCREEN_WIDTH * (scale - 1)) / 2;
-            const maxTranslateY = (SCREEN_HEIGHT * (scale - 1)) / 2;
-
-            const newTranslateX = Math.max(
-              -maxTranslateX,
-              Math.min(
-                maxTranslateX,
-                lastTranslateX.current + gestureState.dx,
-              ),
-            );
-            const newTranslateY = Math.max(
-              -maxTranslateY,
-              Math.min(
-                maxTranslateY,
-                lastTranslateY.current + gestureState.dy,
-              ),
-            );
-
-            translateX.setValue(newTranslateX);
-            translateY.setValue(newTranslateY);
-          }
-        }
-      },
-      onPanResponderRelease: () => {
-        lastScale.current = scale;
-        lastTranslateX.current = translateX._value;
-        lastTranslateY.current = translateY._value;
-      },
-    }),
-  ).current;
-
-  // Reset zoom
-  const resetZoom = () => {
-    Animated.parallel([
-      Animated.spring(scaleValue, {
-        toValue: 1,
-        useNativeDriver: true,
-      }),
-      Animated.spring(translateX, {
-        toValue: 0,
-        useNativeDriver: true,
-      }),
-      Animated.spring(translateY, {
-        toValue: 0,
-        useNativeDriver: true,
-      }),
-    ]).start();
-    setScale(1);
-    lastScale.current = 1;
-    lastTranslateX.current = 0;
-    lastTranslateY.current = 0;
+  const cellSizes = {
+    small: {width: 60, height: 30, fontSize: 10},
+    medium: {width: 80, height: 35, fontSize: 11},
+    large: {width: 110, height: 45, fontSize: 13},
   };
+
+  const currentSize = cellSizes[zoomLevel];
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View>
+        <View style={styles.titleContainer}>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.subtitle}>{subtitle}</Text>
         </View>
-        {scale > 1 && (
-          <Text style={styles.zoomIndicator} onPress={resetZoom}>
-            Reset Zoom ({scale.toFixed(1)}x)
-          </Text>
-        )}
+        
+        <View style={styles.zoomControls}>
+          <TouchableOpacity
+            style={[styles.zoomButton, zoomLevel === 'small' && styles.zoomButtonActive]}
+            onPress={() => setZoomLevel('small')}>
+            <Text style={[styles.zoomButtonText, zoomLevel === 'small' && styles.zoomButtonTextActive]}>
+              S
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.zoomButton, zoomLevel === 'medium' && styles.zoomButtonActive]}
+            onPress={() => setZoomLevel('medium')}>
+            <Text style={[styles.zoomButtonText, zoomLevel === 'medium' && styles.zoomButtonTextActive]}>
+              M
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.zoomButton, zoomLevel === 'large' && styles.zoomButtonActive]}
+            onPress={() => setZoomLevel('large')}>
+            <Text style={[styles.zoomButtonText, zoomLevel === 'large' && styles.zoomButtonTextActive]}>
+              L
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <Animated.View
-        style={[
-          styles.zoomableContainer,
-          {
-            transform: [
-              {scale: scaleValue},
-              {translateX: translateX},
-              {translateY: translateY},
-            ],
-          },
-        ]}
-        {...panResponder.panHandlers}>
-        <View style={styles.heatmapGrid}>
-          {/* Header row with plant names */}
-          <View style={styles.headerRow}>
-            <View style={styles.hourHeaderCell}>
-              <Text style={styles.headerText}>Hour</Text>
-            </View>
-            {heatmapData.plants?.map((plant: string, idx: number) => (
-              <View key={idx} style={styles.plantCell}>
-                <Text style={styles.headerText}>{plant.split('--')[0]}</Text>
-                <Text style={styles.capacityText}>{plant.split('--')[1]}</Text>
+      <ScrollView 
+        style={styles.verticalScroll}
+        showsVerticalScrollIndicator={true}
+        bounces={false}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={true}
+          bounces={false}>
+          <View style={styles.heatmapGrid}>
+            {/* Header row with plant names */}
+            <View style={styles.headerRow}>
+              <View style={[styles.hourHeaderCell, {width: 50, height: currentSize.height + 25}]}>
+                <Text style={styles.headerText}>Hour</Text>
               </View>
-            ))}
-          </View>
-
-          {/* Data rows */}
-          {heatmapData.hours?.map((hour: string, hourIndex: number) => {
-            const rowValues = heatmapData.values[hourIndex];
-            const maxValue = Math.max(...rowValues);
-            return (
-              <View key={hourIndex} style={styles.dataRow}>
-                <View style={styles.hourDataCell}>
-                  <Text style={styles.hourText}>{hour}</Text>
+              {heatmapData.plants?.map((plant: string, idx: number) => (
+                <View 
+                  key={idx} 
+                  style={[
+                    styles.plantCell, 
+                    {width: currentSize.width, height: currentSize.height + 25}
+                  ]}>
+                  <Text style={[styles.headerText, {fontSize: currentSize.fontSize}]} numberOfLines={3}>
+                    {plant.split('--')[0]}
+                  </Text>
+                  <Text style={[styles.capacityText, {fontSize: currentSize.fontSize - 2}]}>
+                    {plant.split('--')[1]}
+                  </Text>
                 </View>
-                {rowValues.map((value: number, plantIndex: number) => (
-                  <View key={plantIndex}>
-                    {renderCell(value, maxValue)}
+              ))}
+            </View>
+
+            {/* Data rows */}
+            {heatmapData.hours?.map((hour: string, hourIndex: number) => {
+              const rowValues = heatmapData.values[hourIndex];
+              const maxValue = Math.max(...rowValues.filter((v: number) => v > 0), 1);
+              return (
+                <View key={hourIndex} style={styles.dataRow}>
+                  <View style={[styles.hourDataCell, {width: 50, height: currentSize.height}]}>
+                    <Text style={styles.hourText}>{hour}</Text>
                   </View>
-                ))}
-              </View>
-            );
-          })}
-        </View>
-      </Animated.View>
+                  {rowValues.map((value: number, plantIndex: number) => (
+                    <View 
+                      key={plantIndex}
+                      style={{width: currentSize.width, height: currentSize.height}}>
+                      {renderCell(value, maxValue)}
+                    </View>
+                  ))}
+                </View>
+              );
+            })}
+          </View>
+        </ScrollView>
+      </ScrollView>
 
       <View style={styles.instructions}>
         <Text style={styles.instructionText}>
-          💡 Pinch to zoom • Drag to pan • Tap "Reset" to restore
+          💡 Use S/M/L buttons to adjust cell size • Scroll horizontally and vertically
         </Text>
       </View>
     </View>
@@ -203,25 +141,46 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
+  titleContainer: {
+    flex: 1,
+  },
   title: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#2c3e50',
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 11,
     color: '#7f8c8d',
     marginTop: 2,
   },
-  zoomIndicator: {
-    fontSize: 12,
-    color: '#3498db',
-    fontWeight: '600',
-    padding: 8,
-    backgroundColor: '#e3f2fd',
-    borderRadius: 6,
+  zoomControls: {
+    flexDirection: 'row',
+    gap: 6,
   },
-  zoomableContainer: {
+  zoomButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#d0d0d0',
+  },
+  zoomButtonActive: {
+    backgroundColor: '#3498db',
+    borderColor: '#3498db',
+  },
+  zoomButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#7f8c8d',
+  },
+  zoomButtonTextActive: {
+    color: '#fff',
+  },
+  verticalScroll: {
     flex: 1,
   },
   heatmapGrid: {
@@ -232,8 +191,6 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   hourHeaderCell: {
-    width: 50,
-    height: 60,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#34495e',
@@ -241,8 +198,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   plantCell: {
-    width: 80,
-    height: 60,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#34495e',
@@ -253,21 +208,18 @@ const styles = StyleSheet.create({
   headerText: {
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: 11,
     textAlign: 'center',
   },
   capacityText: {
     color: '#ecf0f1',
-    fontSize: 9,
     marginTop: 2,
+    textAlign: 'center',
   },
   dataRow: {
     flexDirection: 'row',
     marginBottom: 2,
   },
   hourDataCell: {
-    width: 50,
-    height: 35,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#34495e',
@@ -279,23 +231,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 12,
   },
-  heatmapCell: {
-    width: 80,
-    height: 35,
-    padding: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 2,
-    borderRadius: 4,
-  },
   instructions: {
-    padding: 15,
+    padding: 12,
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
   },
   instructionText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#7f8c8d',
     textAlign: 'center',
     fontStyle: 'italic',

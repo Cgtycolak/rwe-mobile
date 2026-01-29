@@ -91,7 +91,7 @@ const HeatmapScreen = () => {
     }
     
     return (
-      <View style={[styles.heatmapCell, {backgroundColor}]}>
+      <View style={[styles.heatmapCell, {backgroundColor, flex: 1, marginRight: 2, borderRadius: 4}]}>
         <Text style={[styles.cellText, {color: textColor}]}>
           {value.toFixed(0)}
         </Text>
@@ -493,15 +493,9 @@ const styles = StyleSheet.create({
     borderRightColor: '#34495e',
   },
   heatmapCell: {
-    width: 65,
-    height: 40,
     padding: 4,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRightWidth: 1,
-    borderRightColor: '#ecf0f1',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ecf0f1',
   },
   cellText: {
     fontSize: 11,
