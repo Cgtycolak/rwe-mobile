@@ -66,7 +66,12 @@ const HomeScreen = () => {
       color: '#8e44ad',
       screen: 'LigniteHeatmap',
     },
-    // More screens will be added here as we implement them
+    {
+      title: 'CAO Charts',
+      icon: 'chart-line',
+      color: '#27ae60',
+      screen: 'CaoCharts',
+    },
   ];
 
   return (

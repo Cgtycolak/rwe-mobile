@@ -3,6 +3,7 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {useAuth} from '../context/AuthContext';
 import LoginScreen from '../screens/Auth/LoginScreen';
 import HomeScreen from '../screens/Home/HomeScreen';
+import CaoChartsScreen from '../screens/Analytics/CaoChartsScreen';
 import HeatmapScreen from '../screens/Heatmap/HeatmapScreen';
 import HydroHeatmapScreen from '../screens/Heatmap/HydroHeatmapScreen';
 import ImportCoalHeatmapScreen from '../screens/Heatmap/ImportCoalHeatmapScreen';
@@ -58,6 +59,20 @@ const MainNavigator = () => {
             component={HeatmapScreen}
             options={{
               title: 'Natural Gas',
+              headerStyle: {
+                backgroundColor: '#2c3e50',
+              },
+              headerTintColor: '#ecf0f1',
+              headerTitleStyle: {
+                fontWeight: 'bold',
+              },
+            }}
+          />
+          <Stack.Screen
+            name="CaoCharts"
+            component={CaoChartsScreen}
+            options={{
+              title: 'CAO Charts',
               headerStyle: {
                 backgroundColor: '#2c3e50',
               },
