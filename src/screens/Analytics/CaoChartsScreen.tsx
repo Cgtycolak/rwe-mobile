@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useState} from 'react';
 import {ActivityIndicator, Platform, StyleSheet, View, Text} from 'react-native';
 import {WebView} from 'react-native-webview';
 
@@ -7,19 +7,6 @@ const CAO_CHARTS_URL = 'https://rwe-dashboard.onrender.com/#rolling-averages';
 const CaoChartsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // On web, just redirect the browser/tab to the existing Flask page
-  useEffect(() => {
-    if (Platform.OS === 'web') {
-      try {
-        // @ts-ignore - window is only available on web
-        window.location.href = CAO_CHARTS_URL;
-      } catch (e) {
-        setError('Automatic redirect to CAO charts failed.');
-        setLoading(false);
-      }
-    }
-  }, []);
 
   return (
     <View style={styles.container}>
@@ -36,10 +23,14 @@ const CaoChartsScreen = () => {
           </Text>
         </View>
       ) : Platform.OS === 'web' ? (
-        // While redirecting on web, just show a simple loader
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#3498db" />
-        </View>
+        // Web/PWA: embed Flask page in an iframe so it stays inside the app shell
+        // eslint-disable-next-line react/no-unknown-property
+        <iframe
+          src={CAO_CHARTS_URL}
+          style={styles.iframe as any}
+          onLoad={() => setLoading(false)}
+          title="CAO Charts"
+        />
       ) : (
         <WebView
           source={{uri: CAO_CHARTS_URL}}
@@ -94,6 +85,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#7f8c8d',
     textAlign: 'center',
+  },
+  iframe: {
+    flex: 1,
+    borderWidth: 0,
   },
 });
 
