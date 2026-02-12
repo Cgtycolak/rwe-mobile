@@ -1,5 +1,5 @@
-import React, {useState} from 'react';
-import {ActivityIndicator, StyleSheet, View, Text} from 'react-native';
+import React, {useEffect, useState} from 'react';
+import {ActivityIndicator, Platform, StyleSheet, View, Text} from 'react-native';
 import {WebView} from 'react-native-webview';
 
 const CAO_CHARTS_URL = 'https://rwe-dashboard.onrender.com/#rolling-averages';
@@ -7,6 +7,19 @@ const CAO_CHARTS_URL = 'https://rwe-dashboard.onrender.com/#rolling-averages';
 const CaoChartsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // On web, just redirect the browser/tab to the existing Flask page
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      try {
+        // @ts-ignore - window is only available on web
+        window.location.href = CAO_CHARTS_URL;
+      } catch (e) {
+        setError('Automatic redirect to CAO charts failed.');
+        setLoading(false);
+      }
+    }
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -22,6 +35,11 @@ const CaoChartsScreen = () => {
             {error || 'Please check your connection or try again later.'}
           </Text>
         </View>
+      ) : Platform.OS === 'web' ? (
+        // While redirecting on web, just show a simple loader
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#3498db" />
+        </View>
       ) : (
         <WebView
           source={{uri: CAO_CHARTS_URL}}
@@ -30,7 +48,7 @@ const CaoChartsScreen = () => {
             setLoading(true);
           }}
           onLoadEnd={() => setLoading(false)}
-          onError={e => {
+          onError={(e: any) => {
             console.log('CAO WebView error', e.nativeEvent);
             setLoading(false);
             setError('The rolling averages page could not be loaded from the server.');
