@@ -1,19 +1,14 @@
 import React, {useEffect, useState} from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import {
-  VictoryAxis,
-  VictoryChart,
-  VictoryLegend,
-  VictoryLine,
-  VictoryTheme,
-} from 'victory-native';
+import Svg, {Line as SvgLine, Polyline} from 'react-native-svg';
 import apiService from '../../services/apiService';
 
 type RollingSeries = {
@@ -82,81 +77,128 @@ const CaoChartsScreen = () => {
     const prevYear = series[String(currentYear - 1)] || [];
     const currYear = series[String(currentYear)] || [];
 
-    const histData = histAvg.map((y, i) => ({x: i + 1, y}));
-    const prevData = prevYear.map((y: number, i: number) => ({x: i + 1, y}));
-    const currData = currYear.map((y: number, i: number) => ({x: i + 1, y}));
+    const allValues = [...histAvg, ...prevYear, ...currYear].filter(
+      v => typeof v === 'number' && !Number.isNaN(v),
+    ) as number[];
 
-    const maxLen = Math.max(histData.length, prevData.length, currData.length);
+    if (allValues.length === 0) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No data available for this series.</Text>
+        </View>
+      );
+    }
+
+    const maxLen = Math.max(histAvg.length, prevYear.length, currYear.length);
+    const width = Dimensions.get('window').width - 48;
+    const height = 220;
+    const padding = 24;
+    const minY = 0;
+    const maxY = Math.max(...allValues);
+    const rangeY = maxY - minY || 1;
+
+    const makePoints = (arr: number[]) => {
+      if (!arr.length) {
+        return '';
+      }
+      return arr
+        .map((y, i) => {
+          const xRatio = maxLen > 1 ? i / (maxLen - 1) : 0;
+          const x = padding + xRatio * (width - padding * 2);
+          const yClamped = Math.max(minY, Math.min(maxY, y));
+          const yRatio = (yClamped - minY) / rangeY;
+          const yCoord = height - padding - yRatio * (height - padding * 2);
+          return `${x},${yCoord}`;
+        })
+        .join(' ');
+    };
+
+    const histPoints = makePoints(histAvg);
+    const prevPoints = makePoints(prevYear);
+    const currPoints = makePoints(currYear);
+
+    // Simple x-axis ticks: 6 evenly spaced labels
     const tickCount = 6;
-    const step = Math.max(1, Math.floor(maxLen / (tickCount - 1)));
-    const tickValues = Array.from(
-      {length: tickCount},
-      (_, i) => i * step + 1,
-    ).filter(v => v <= maxLen);
+    const xStep = Math.max(1, Math.floor(maxLen / (tickCount - 1)));
+    const xTicks = Array.from({length: tickCount}, (_, i) => i * xStep + 1).filter(
+      v => v <= maxLen,
+    );
 
     return (
-      <VictoryChart
-        theme={VictoryTheme.material}
-        height={260}
-        padding={{top: 20, bottom: 50, left: 60, right: 20}}>
-        <VictoryAxis
-          tickValues={tickValues}
-          tickFormat={(v: number) => `Day ${v}`}
-          style={{
-            tickLabels: {fontSize: 10},
-            axisLabel: {fontSize: 12, padding: 35},
-          }}
-        />
-        <VictoryAxis
-          dependentAxis
-          tickFormat={(t: number) => `${Math.round(t / 1000)}k`}
-          style={{
-            tickLabels: {fontSize: 10},
-          }}
-        />
-
-        {histData.length > 0 && (
-          <VictoryLine
-            data={histData}
-            style={{
-              data: {stroke: '#2980b9', strokeDasharray: '6,4', strokeWidth: 2},
-            }}
+      <View>
+        <Svg width={width} height={height}>
+          {/* Axes */}
+          <SvgLine
+            x1={padding}
+            y1={height - padding}
+            x2={width - padding}
+            y2={height - padding}
+            stroke="#bdc3c7"
+            strokeWidth={1}
           />
-        )}
-
-        {prevData.length > 0 && (
-          <VictoryLine
-            data={prevData}
-            style={{
-              data: {stroke: '#2c3e50', strokeWidth: 2},
-            }}
+          <SvgLine
+            x1={padding}
+            y1={padding}
+            x2={padding}
+            y2={height - padding}
+            stroke="#bdc3c7"
+            strokeWidth={1}
           />
-        )}
 
-        {currData.length > 0 && (
-          <VictoryLine
-            data={currData}
-            style={{
-              data: {stroke: '#e74c3c', strokeWidth: 2},
-            }}
-          />
-        )}
+          {/* Historical avg */}
+          {histPoints ? (
+            <Polyline
+              points={histPoints}
+              fill="none"
+              stroke="#2980b9"
+              strokeWidth={2}
+            />
+          ) : null}
 
-        <VictoryLegend
-          x={40}
-          y={10}
-          orientation="horizontal"
-          gutter={10}
-          style={{
-            labels: {fontSize: 10},
-          }}
-          data={[
-            {name: 'Hist. avg', symbol: {fill: '#2980b9'}},
-            {name: String(currentYear - 1), symbol: {fill: '#2c3e50'}},
-            {name: String(currentYear), symbol: {fill: '#e74c3c'}},
-          ]}
-        />
-      </VictoryChart>
+          {/* Previous year */}
+          {prevPoints ? (
+            <Polyline
+              points={prevPoints}
+              fill="none"
+              stroke="#2c3e50"
+              strokeWidth={2}
+            />
+          ) : null}
+
+          {/* Current year */}
+          {currPoints ? (
+            <Polyline
+              points={currPoints}
+              fill="none"
+              stroke="#e74c3c"
+              strokeWidth={2}
+            />
+          ) : null}
+        </Svg>
+
+        <View style={styles.legendRow}>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendSwatch, {backgroundColor: '#2980b9'}]} />
+            <Text style={styles.legendText}>Hist. avg</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendSwatch, {backgroundColor: '#2c3e50'}]} />
+            <Text style={styles.legendText}>{currentYear - 1}</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendSwatch, {backgroundColor: '#e74c3c'}]} />
+            <Text style={styles.legendText}>{currentYear}</Text>
+          </View>
+        </View>
+
+        <View style={styles.xTicksRow}>
+          {xTicks.map(v => (
+            <Text key={v} style={styles.xTickLabel}>
+              Day {v}
+            </Text>
+          ))}
+        </View>
+      </View>
     );
   };
 
@@ -312,6 +354,37 @@ const styles = StyleSheet.create({
   emptyText: {
     color: '#7f8c8d',
     fontSize: 14,
+  },
+  legendRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    marginTop: 8,
+    marginLeft: 8,
+    gap: 16,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  legendSwatch: {
+    width: 12,
+    height: 12,
+    borderRadius: 2,
+    marginRight: 6,
+  },
+  legendText: {
+    fontSize: 11,
+    color: '#2c3e50',
+  },
+  xTicksRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 6,
+    marginHorizontal: 12,
+  },
+  xTickLabel: {
+    fontSize: 10,
+    color: '#7f8c8d',
   },
 });
 
