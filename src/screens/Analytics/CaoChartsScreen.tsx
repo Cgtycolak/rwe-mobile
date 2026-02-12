@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Svg, {Line as SvgLine, Polyline} from 'react-native-svg';
+import Svg, {Line as SvgLine, Polyline, Polygon} from 'react-native-svg';
 import apiService from '../../services/apiService';
 
 type RollingSeries = {
@@ -19,6 +19,12 @@ type RollingSeries = {
 
 type RollingDataResponse = {
   [key: string]: RollingSeries;
+};
+
+type DemandDataResponse = {
+  consumption?: {
+    [year: string]: number[];
+  };
 };
 
 const FUEL_TYPES: {key: string; label: string}[] = [
@@ -38,6 +44,7 @@ const CaoChartsScreen = () => {
   const [rollingData, setRollingData] = useState<RollingDataResponse | null>(
     null,
   );
+  const [demandData, setDemandData] = useState<DemandDataResponse | null>(null);
   const [selectedType, setSelectedType] = useState<string>('naturalgas');
 
   const currentYear = new Date().getFullYear();
@@ -47,8 +54,12 @@ const CaoChartsScreen = () => {
       try {
         setLoading(true);
         setError(null);
-        const data = await apiService.getRollingData();
-        setRollingData(data);
+        const [rolling, demand] = await Promise.all([
+          apiService.getRollingData(),
+          apiService.getDemandData(),
+        ]);
+        setRollingData(rolling);
+        setDemandData(demand);
       } catch (e: any) {
         setError(e.message || 'Failed to load CAO charts data.');
       } finally {
@@ -60,6 +71,135 @@ const CaoChartsScreen = () => {
   }, []);
 
   const renderChart = () => {
+    // Special handling for Demand: uses separate endpoint and weekly data
+    if (selectedType === 'consumption') {
+      if (!demandData || !demandData.consumption) {
+        return (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No data available for this series.</Text>
+          </View>
+        );
+      }
+
+      const prevSeries =
+        demandData.consumption[String(currentYear - 1)] || [];
+      const currSeries = demandData.consumption[String(currentYear)] || [];
+
+      if (!prevSeries.length && !currSeries.length) {
+        return (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No data available for this series.</Text>
+          </View>
+        );
+      }
+
+      const width = Dimensions.get('window').width - 48;
+      const height = 220;
+      const padding = 24;
+
+      const allDemandValues = [...prevSeries, ...currSeries].filter(
+        v => typeof v === 'number' && !Number.isNaN(v),
+      ) as number[];
+      const minY = 0;
+      const maxY = Math.max(...allDemandValues);
+      const rangeY = maxY - minY || 1;
+      const maxLen = Math.max(prevSeries.length, currSeries.length);
+
+      const makePoints = (arr: number[]) => {
+        if (!arr.length) {
+          return '';
+        }
+        return arr
+          .map((y, i) => {
+            const xRatio = maxLen > 1 ? i / (maxLen - 1) : 0;
+            const x = padding + xRatio * (width - padding * 2);
+            const yClamped = Math.max(minY, Math.min(maxY, y));
+            const yRatio = (yClamped - minY) / rangeY;
+            const yCoord = height - padding - yRatio * (height - padding * 2);
+            return `${x},${yCoord}`;
+          })
+          .join(' ');
+      };
+
+      const prevPoints = makePoints(prevSeries);
+      const currPoints = makePoints(currSeries);
+
+      const tickCount = 6;
+      const xStep = Math.max(1, Math.floor(maxLen / (tickCount - 1)));
+      const xTicks = Array.from(
+        {length: tickCount},
+        (_, i) => i * xStep + 1,
+      ).filter(v => v <= maxLen);
+
+      return (
+        <View>
+          <Svg width={width} height={height}>
+            {/* Axes */}
+            <SvgLine
+              x1={padding}
+              y1={height - padding}
+              x2={width - padding}
+              y2={height - padding}
+              stroke="#bdc3c7"
+              strokeWidth={1}
+            />
+            <SvgLine
+              x1={padding}
+              y1={padding}
+              x2={padding}
+              y2={height - padding}
+              stroke="#bdc3c7"
+              strokeWidth={1}
+            />
+
+            {/* Previous year */}
+            {prevPoints ? (
+              <Polyline
+                points={prevPoints}
+                fill="none"
+                stroke="#2c3e50"
+                strokeWidth={2}
+              />
+            ) : null}
+
+            {/* Current year */}
+            {currPoints ? (
+              <Polyline
+                points={currPoints}
+                fill="none"
+                stroke="#e74c3c"
+                strokeWidth={2}
+              />
+            ) : null}
+          </Svg>
+
+          <View style={styles.legendRow}>
+            <View style={styles.legendItem}>
+              <View
+                style={[styles.legendSwatch, {backgroundColor: '#2c3e50'}]}
+              />
+              <Text style={styles.legendText}>{currentYear - 1}</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View
+                style={[styles.legendSwatch, {backgroundColor: '#e74c3c'}]}
+              />
+              <Text style={styles.legendText}>{currentYear}</Text>
+            </View>
+          </View>
+
+          <View style={styles.xTicksRow}>
+            {xTicks.map(v => (
+              <Text key={v} style={styles.xTickLabel}>
+                Week {v}
+              </Text>
+            ))}
+          </View>
+        </View>
+      );
+    }
+
+    // Other fuel types: use rollingData with historical band
     if (!rollingData) {
       return null;
     }
@@ -74,10 +214,17 @@ const CaoChartsScreen = () => {
     }
 
     const histAvg = series.historical_avg || [];
-    const prevYear = series[String(currentYear - 1)] || [];
-    const currYear = series[String(currentYear)] || [];
+    const histRange = series.historical_range || [];
+    const prevYearSeries = series[String(currentYear - 1)] || [];
+    const currYearSeries = series[String(currentYear)] || [];
 
-    const allValues = [...histAvg, ...prevYear, ...currYear].filter(
+    const allValues = [
+      ...histAvg,
+      ...histRange.map(r => (r.max != null ? r.max : r.min ?? 0)),
+      ...histRange.map(r => (r.min != null ? r.min : r.max ?? 0)),
+      ...prevYearSeries,
+      ...currYearSeries,
+    ].filter(
       v => typeof v === 'number' && !Number.isNaN(v),
     ) as number[];
 
@@ -89,7 +236,12 @@ const CaoChartsScreen = () => {
       );
     }
 
-    const maxLen = Math.max(histAvg.length, prevYear.length, currYear.length);
+    const maxLen = Math.max(
+      histAvg.length,
+      histRange.length,
+      prevYearSeries.length,
+      currYearSeries.length,
+    );
     const width = Dimensions.get('window').width - 48;
     const height = 220;
     const padding = 24;
@@ -114,8 +266,40 @@ const CaoChartsScreen = () => {
     };
 
     const histPoints = makePoints(histAvg);
-    const prevPoints = makePoints(prevYear);
-    const currPoints = makePoints(currYear);
+    const prevPoints = makePoints(prevYearSeries);
+    const currPoints = makePoints(currYearSeries);
+
+    // Historical range polygon (2016–2025 band)
+    let rangePoints = '';
+    if (histRange.length) {
+      const maxPts: string[] = [];
+      const minPts: string[] = [];
+
+      histRange.forEach((r, i) => {
+        const maxVal = r.max != null ? r.max : r.min ?? 0;
+        const minVal = r.min != null ? r.min : r.max ?? 0;
+        const xRatio = maxLen > 1 ? i / (maxLen - 1) : 0;
+        const x = padding + xRatio * (width - padding * 2);
+
+        const clamp = (yVal: number) =>
+          Math.max(minY, Math.min(maxY, yVal || 0));
+
+        const maxClamped = clamp(maxVal);
+        const minClamped = clamp(minVal);
+
+        const maxRatio = (maxClamped - minY) / rangeY;
+        const minRatio = (minClamped - minY) / rangeY;
+        const yMaxCoord =
+          height - padding - maxRatio * (height - padding * 2);
+        const yMinCoord =
+          height - padding - minRatio * (height - padding * 2);
+
+        maxPts.push(`${x},${yMaxCoord}`);
+        minPts.push(`${x},${yMinCoord}`);
+      });
+
+      rangePoints = [...maxPts, ...minPts.reverse()].join(' ');
+    }
 
     // Simple x-axis ticks: 6 evenly spaced labels
     const tickCount = 6;
@@ -144,6 +328,15 @@ const CaoChartsScreen = () => {
             stroke="#bdc3c7"
             strokeWidth={1}
           />
+
+          {/* Historical 2016–2025 range */}
+          {rangePoints ? (
+            <Polygon
+              points={rangePoints}
+              fill="rgba(135, 206, 250, 0.4)"
+              stroke="none"
+            />
+          ) : null}
 
           {/* Historical avg */}
           {histPoints ? (
