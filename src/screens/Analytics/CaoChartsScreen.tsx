@@ -23,6 +23,7 @@ let Tooltip: any;
 let Legend: any;
 let ResponsiveContainer: any;
 let ComposedChart: any;
+let ReferenceArea: any;
 
 if (Platform.OS === 'web') {
   try {
@@ -38,6 +39,7 @@ if (Platform.OS === 'web') {
     Legend = Recharts.Legend;
     ResponsiveContainer = Recharts.ResponsiveContainer;
     ComposedChart = Recharts.ComposedChart;
+    ReferenceArea = Recharts.ReferenceArea;
   } catch (e) {
     console.warn('Recharts not available, using SVG fallback');
   }
@@ -81,6 +83,7 @@ const CaoChartsScreen = () => {
   );
   const [demandData, setDemandData] = useState<DemandDataResponse | null>(null);
   const [selectedType, setSelectedType] = useState<string>('naturalgas');
+  const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());
 
   const currentYear = new Date().getFullYear();
   const screenWidth = Dimensions.get('window').width;
@@ -162,25 +165,54 @@ const CaoChartsScreen = () => {
                 <Legend
                   wrapperStyle={{paddingTop: 10}}
                   iconType="line"
+                  onClick={(e: any) => {
+                    const dataKey = e.dataKey || e.value;
+                    if (dataKey) {
+                      setHiddenSeries(prev => {
+                        const newSet = new Set(prev);
+                        if (newSet.has(dataKey)) {
+                          newSet.delete(dataKey);
+                        } else {
+                          newSet.add(dataKey);
+                        }
+                        return newSet;
+                      });
+                    }
+                  }}
+                  formatter={(value: string, entry: any) => {
+                    const dataKey = entry.dataKey || entry.value;
+                    const isHidden = hiddenSeries.has(dataKey);
+                    return (
+                      <span style={{opacity: isHidden ? 0.3 : 1, cursor: 'pointer', userSelect: 'none'}}>
+                        {value}
+                      </span>
+                    );
+                  }}
                 />
-                <Line
-                  type="monotone"
-                  dataKey="prev"
-                  stroke="#2c3e50"
-                  strokeWidth={2.5}
-                  name={`${currentYear - 1}`}
-                  dot={false}
-                  activeDot={{r: 6}}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="curr"
-                  stroke="#e74c3c"
-                  strokeWidth={2.5}
-                  name={`${currentYear}`}
-                  dot={false}
-                  activeDot={{r: 6}}
-                />
+                {!hiddenSeries.has('prev') && (
+                  <Line
+                    type="monotone"
+                    dataKey="prev"
+                    stroke="#2c3e50"
+                    strokeWidth={2.5}
+                    name={`${currentYear - 1}`}
+                    dot={false}
+                    activeDot={{r: 6}}
+                    hide={hiddenSeries.has('prev')}
+                  />
+                )}
+                {!hiddenSeries.has('curr') && (
+                  <Line
+                    type="monotone"
+                    dataKey="curr"
+                    stroke="#e74c3c"
+                    strokeWidth={2.5}
+                    name={`${currentYear}`}
+                    dot={false}
+                    activeDot={{r: 6}}
+                    hide={hiddenSeries.has('curr')}
+                  />
+                )}
               </ComposedChart>
             </ResponsiveContainer>
           </View>
@@ -217,14 +249,20 @@ const CaoChartsScreen = () => {
       currYearSeries.length,
     );
 
-    const chartData = Array.from({length: maxLen}, (_, i) => ({
-      day: i + 1,
-      histAvg: histAvg[i] || null,
-      histMax: histRange[i]?.max || null,
-      histMin: histRange[i]?.min || null,
-      prev: prevYearSeries[i] || null,
-      curr: currYearSeries[i] || null,
-    }));
+    const chartData = Array.from({length: maxLen}, (_, i) => {
+      const max = histRange[i]?.max || null;
+      const min = histRange[i]?.min || null;
+      return {
+        day: i + 1,
+        histAvg: histAvg[i] || null,
+        histMax: max,
+        histMin: min,
+        histRangeTop: max, // For the range area
+        histRangeBottom: min, // For the range area
+        prev: prevYearSeries[i] || null,
+        curr: currYearSeries[i] || null,
+      };
+    });
 
     if (useRecharts) {
       return (
@@ -258,50 +296,80 @@ const CaoChartsScreen = () => {
               <Legend
                 wrapperStyle={{paddingTop: 10}}
                 iconType="line"
+                onClick={(e: any) => {
+                  const dataKey = e.dataKey || e.value;
+                  if (dataKey) {
+                    setHiddenSeries(prev => {
+                      const newSet = new Set(prev);
+                      if (newSet.has(dataKey)) {
+                        newSet.delete(dataKey);
+                      } else {
+                        newSet.add(dataKey);
+                      }
+                      return newSet;
+                    });
+                  }
+                }}
+                formatter={(value: string, entry: any) => {
+                  const dataKey = entry.dataKey || entry.value;
+                  const isHidden = hiddenSeries.has(dataKey);
+                  return (
+                    <span style={{opacity: isHidden ? 0.3 : 1, cursor: 'pointer', userSelect: 'none'}}>
+                      {value}
+                    </span>
+                  );
+                }}
               />
-              {/* Historical range area */}
-              <Area
-                type="monotone"
-                dataKey="histMax"
-                stroke="none"
-                fill="rgba(135, 206, 250, 0.4)"
-                connectNulls
-              />
-              <Area
-                type="monotone"
-                dataKey="histMin"
-                stroke="none"
-                fill="rgba(135, 206, 250, 0.4)"
-                connectNulls
-              />
-              <Line
-                type="monotone"
-                dataKey="histAvg"
-                stroke="#2980b9"
-                strokeWidth={2}
-                strokeDasharray="5 5"
-                name="Hist. avg"
-                dot={false}
-                activeDot={{r: 6}}
-              />
-              <Line
-                type="monotone"
-                dataKey="prev"
-                stroke="#2c3e50"
-                strokeWidth={2.5}
-                name={`${currentYear - 1}`}
-                dot={false}
-                activeDot={{r: 6}}
-              />
-              <Line
-                type="monotone"
-                dataKey="curr"
-                stroke="#e74c3c"
-                strokeWidth={2.5}
-                name={`${currentYear}`}
-                dot={false}
-                activeDot={{r: 6}}
-              />
+              {/* Historical range area - use Area with proper baseLine */}
+              {!hiddenSeries.has('histRange') && chartData.length > 0 && (
+                <Area
+                  type="monotone"
+                  dataKey="histMax"
+                  stroke="none"
+                  fill="rgba(135, 206, 250, 0.4)"
+                  connectNulls
+                  baseLine="histMin"
+                  name="2016-2025 Range"
+                  hide={hiddenSeries.has('histRange')}
+                />
+              )}
+              {!hiddenSeries.has('histAvg') && (
+                <Line
+                  type="monotone"
+                  dataKey="histAvg"
+                  stroke="#2980b9"
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                  name="Hist. avg"
+                  dot={false}
+                  activeDot={{r: 6}}
+                  hide={hiddenSeries.has('histAvg')}
+                />
+              )}
+              {!hiddenSeries.has('prev') && (
+                <Line
+                  type="monotone"
+                  dataKey="prev"
+                  stroke="#2c3e50"
+                  strokeWidth={2.5}
+                  name={`${currentYear - 1}`}
+                  dot={false}
+                  activeDot={{r: 6}}
+                  hide={hiddenSeries.has('prev')}
+                />
+              )}
+              {!hiddenSeries.has('curr') && (
+                <Line
+                  type="monotone"
+                  dataKey="curr"
+                  stroke="#e74c3c"
+                  strokeWidth={2.5}
+                  name={`${currentYear}`}
+                  dot={false}
+                  activeDot={{r: 6}}
+                  hide={hiddenSeries.has('curr')}
+                />
+              )}
             </ComposedChart>
           </ResponsiveContainer>
         </View>
