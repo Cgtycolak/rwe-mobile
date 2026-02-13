@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {LineChart, AreaChart} from 'react-native-gifted-charts';
+import Svg, {Line as SvgLine, Polyline, Polygon} from 'react-native-svg';
 import apiService from '../../services/apiService';
 
 type RollingSeries = {
@@ -48,7 +48,6 @@ const CaoChartsScreen = () => {
   const [selectedType, setSelectedType] = useState<string>('naturalgas');
 
   const currentYear = new Date().getFullYear();
-  const screenWidth = Dimensions.get('window').width;
 
   useEffect(() => {
     const load = async () => {
@@ -94,92 +93,107 @@ const CaoChartsScreen = () => {
         );
       }
 
-      const maxLen = Math.max(prevSeries.length, currSeries.length);
-      
-      // Prepare data points for gifted-charts
-      const prevData = prevSeries.map((value: number, index: number) => ({
-        value: value || 0,
-        label: index % Math.ceil(maxLen / 6) === 0 ? `W${index + 1}` : '',
-        labelTextStyle: {color: '#7f8c8d', fontSize: 10},
-      }));
+      const width = Dimensions.get('window').width - 48;
+      const height = 220;
+      const padding = 24;
 
-      const currData = currSeries.map((value: number, index: number) => ({
-        value: value || 0,
-        label: index % Math.ceil(maxLen / 6) === 0 ? `W${index + 1}` : '',
-        labelTextStyle: {color: '#7f8c8d', fontSize: 10},
-      }));
+      const allDemandValues = [...prevSeries, ...currSeries].filter(
+        v => typeof v === 'number' && !Number.isNaN(v),
+      ) as number[];
+      const minY = 0;
+      const maxY = Math.max(...allDemandValues);
+      const rangeY = maxY - minY || 1;
+      const maxLen = Math.max(prevSeries.length, currSeries.length);
+
+      const makePoints = (arr: number[]) => {
+        if (!arr.length) {
+          return '';
+        }
+        return arr
+          .map((y, i) => {
+            const xRatio = maxLen > 1 ? i / (maxLen - 1) : 0;
+            const x = padding + xRatio * (width - padding * 2);
+            const yClamped = Math.max(minY, Math.min(maxY, y));
+            const yRatio = (yClamped - minY) / rangeY;
+            const yCoord = height - padding - yRatio * (height - padding * 2);
+            return `${x},${yCoord}`;
+          })
+          .join(' ');
+      };
+
+      const prevPoints = makePoints(prevSeries);
+      const currPoints = makePoints(currSeries);
+
+      const tickCount = 6;
+      const xStep = Math.max(1, Math.floor(maxLen / (tickCount - 1)));
+      const xTicks = Array.from(
+        {length: tickCount},
+        (_, i) => i * xStep + 1,
+      ).filter(v => v <= maxLen);
 
       return (
-        <View style={styles.chartWrapper}>
-          <LineChart
-            data={currData}
-            data2={prevData}
-            height={280}
-            width={screenWidth - 64}
-            spacing={Math.max(2, (screenWidth - 64) / maxLen)}
-            thickness={2.5}
-            thickness2={2.5}
-            color1="#e74c3c"
-            color2="#2c3e50"
-            hideDataPoints={maxLen > 50}
-            dataPointsRadius={4}
-            dataPointsColor1="#e74c3c"
-            dataPointsColor2="#2c3e50"
-            textShiftY={-2}
-            textShiftX={-5}
-            textFontSize={10}
-            curved
-            startFillColor1="rgba(231, 76, 60, 0.1)"
-            endFillColor1="rgba(231, 76, 60, 0.01)"
-            startFillColor2="rgba(44, 62, 80, 0.1)"
-            endFillColor2="rgba(44, 62, 80, 0.01)"
-            areaChart
-            yAxisColor="#bdc3c7"
-            xAxisColor="#bdc3c7"
-            rulesColor="#ecf0f1"
-            rulesType="solid"
-            yAxisTextStyle={{color: '#7f8c8d', fontSize: 10}}
-            xAxisLabelTextStyle={{color: '#7f8c8d', fontSize: 10}}
-            hideYAxisText={false}
-            initialSpacing={10}
-            endSpacing={10}
-            pointerConfig={{
-              pointer1Color: '#e74c3c',
-              pointer2Color: '#2c3e50',
-              activatePointersOnLongPress: true,
-              autoAdjustPointerLabelPosition: true,
-              pointerLabelComponent: (items: any) => {
-                return (
-                  <View style={styles.tooltipContainer}>
-                    <Text style={styles.tooltipText}>
-                      {items[0]?.value?.toFixed(0) || '0'} MWh
-                    </Text>
-                    {items[1] && (
-                      <Text style={styles.tooltipText2}>
-                        {items[1]?.value?.toFixed(0) || '0'} MWh
-                      </Text>
-                    )}
-                  </View>
-                );
-              },
-            }}
-            onDataChangeAnimationDuration={300}
-            animateOnDataChange
-            animationDuration={800}
-            maxValue={Math.max(...prevSeries, ...currSeries) * 1.1}
-            noOfSections={5}
-            yAxisLabelSuffix="k"
-            formatYLabel={(label: string) => `${(parseFloat(label) / 1000).toFixed(0)}k`}
-          />
+        <View>
+          <Svg width={width} height={height}>
+            {/* Axes */}
+            <SvgLine
+              x1={padding}
+              y1={height - padding}
+              x2={width - padding}
+              y2={height - padding}
+              stroke="#bdc3c7"
+              strokeWidth={1}
+            />
+            <SvgLine
+              x1={padding}
+              y1={padding}
+              x2={padding}
+              y2={height - padding}
+              stroke="#bdc3c7"
+              strokeWidth={1}
+            />
+
+            {/* Previous year */}
+            {prevPoints ? (
+              <Polyline
+                points={prevPoints}
+                fill="none"
+                stroke="#2c3e50"
+                strokeWidth={2}
+              />
+            ) : null}
+
+            {/* Current year */}
+            {currPoints ? (
+              <Polyline
+                points={currPoints}
+                fill="none"
+                stroke="#e74c3c"
+                strokeWidth={2}
+              />
+            ) : null}
+          </Svg>
+
           <View style={styles.legendRow}>
             <View style={styles.legendItem}>
-              <View style={[styles.legendSwatch, {backgroundColor: '#2c3e50'}]} />
+              <View
+                style={[styles.legendSwatch, {backgroundColor: '#2c3e50'}]}
+              />
               <Text style={styles.legendText}>{currentYear - 1}</Text>
             </View>
             <View style={styles.legendItem}>
-              <View style={[styles.legendSwatch, {backgroundColor: '#e74c3c'}]} />
+              <View
+                style={[styles.legendSwatch, {backgroundColor: '#e74c3c'}]}
+              />
               <Text style={styles.legendText}>{currentYear}</Text>
             </View>
+          </View>
+
+          <View style={styles.xTicksRow}>
+            {xTicks.map(v => (
+              <Text key={v} style={styles.xTickLabel}>
+                Week {v}
+              </Text>
+            ))}
           </View>
         </View>
       );
@@ -228,138 +242,132 @@ const CaoChartsScreen = () => {
       prevYearSeries.length,
       currYearSeries.length,
     );
+    const width = Dimensions.get('window').width - 48;
+    const height = 220;
+    const padding = 24;
+    const minY = 0;
+    const maxY = Math.max(...allValues);
+    const rangeY = maxY - minY || 1;
 
-    // Prepare data for gifted-charts
-    const histAvgData = histAvg.map((value, index) => ({
-      value: value || 0,
-      label: index % Math.ceil(maxLen / 6) === 0 ? `D${index + 1}` : '',
-      labelTextStyle: {color: '#7f8c8d', fontSize: 10},
-    }));
+    const makePoints = (arr: number[]) => {
+      if (!arr.length) {
+        return '';
+      }
+      return arr
+        .map((y, i) => {
+          const xRatio = maxLen > 1 ? i / (maxLen - 1) : 0;
+          const x = padding + xRatio * (width - padding * 2);
+          const yClamped = Math.max(minY, Math.min(maxY, y));
+          const yRatio = (yClamped - minY) / rangeY;
+          const yCoord = height - padding - yRatio * (height - padding * 2);
+          return `${x},${yCoord}`;
+        })
+        .join(' ');
+    };
 
-    const prevYearData = prevYearSeries.map((value, index) => ({
-      value: value || 0,
-      label: index % Math.ceil(maxLen / 6) === 0 ? `D${index + 1}` : '',
-      labelTextStyle: {color: '#7f8c8d', fontSize: 10},
-    }));
+    const histPoints = makePoints(histAvg);
+    const prevPoints = makePoints(prevYearSeries);
+    const currPoints = makePoints(currYearSeries);
 
-    const currYearData = currYearSeries.map((value, index) => ({
-      value: value || 0,
-      label: index % Math.ceil(maxLen / 6) === 0 ? `D${index + 1}` : '',
-      labelTextStyle: {color: '#7f8c8d', fontSize: 10},
-    }));
+    // Historical range polygon (2016–2025 band)
+    let rangePoints = '';
+    if (histRange.length) {
+      const maxPts: string[] = [];
+      const minPts: string[] = [];
 
-    // Prepare range data for area chart (2016-2025 band)
-    const rangeData = histRange.map((r, index) => {
-      const maxVal = r.max != null ? r.max : r.min ?? 0;
-      const minVal = r.min != null ? r.min : r.max ?? 0;
-      return {
-        value: maxVal,
-        value2: minVal,
-        label: index % Math.ceil(maxLen / 6) === 0 ? `D${index + 1}` : '',
-        labelTextStyle: {color: '#7f8c8d', fontSize: 10},
-      };
-    });
+      histRange.forEach((r, i) => {
+        const maxVal = r.max != null ? r.max : r.min ?? 0;
+        const minVal = r.min != null ? r.min : r.max ?? 0;
+        const xRatio = maxLen > 1 ? i / (maxLen - 1) : 0;
+        const x = padding + xRatio * (width - padding * 2);
 
-    const maxValue = Math.max(...allValues) * 1.1;
+        const clamp = (yVal: number) =>
+          Math.max(minY, Math.min(maxY, yVal || 0));
+
+        const maxClamped = clamp(maxVal);
+        const minClamped = clamp(minVal);
+
+        const maxRatio = (maxClamped - minY) / rangeY;
+        const minRatio = (minClamped - minY) / rangeY;
+        const yMaxCoord =
+          height - padding - maxRatio * (height - padding * 2);
+        const yMinCoord =
+          height - padding - minRatio * (height - padding * 2);
+
+        maxPts.push(`${x},${yMaxCoord}`);
+        minPts.push(`${x},${yMinCoord}`);
+      });
+
+      rangePoints = [...maxPts, ...minPts.reverse()].join(' ');
+    }
+
+    // Simple x-axis ticks: 6 evenly spaced labels
+    const tickCount = 6;
+    const xStep = Math.max(1, Math.floor(maxLen / (tickCount - 1)));
+    const xTicks = Array.from({length: tickCount}, (_, i) => i * xStep + 1).filter(
+      v => v <= maxLen,
+    );
 
     return (
-      <View style={styles.chartWrapper}>
-        {/* Historical range area (2016-2025 band) */}
-        {rangeData.length > 0 && (
-          <View style={styles.rangeChartContainer}>
-            <AreaChart
-              data={rangeData.map(d => ({value: d.value}))}
-              data2={rangeData.map(d => ({value: d.value2}))}
-              height={280}
-              width={screenWidth - 64}
-              spacing={Math.max(2, (screenWidth - 64) / maxLen)}
-              startFillColor="rgba(135, 206, 250, 0.4)"
-              endFillColor="rgba(135, 206, 250, 0.1)"
-              startFillColor2="rgba(135, 206, 250, 0.4)"
-              endFillColor2="rgba(135, 206, 250, 0.1)"
-              hideDataPoints
-              hideYAxisText
-              hideRules
-              hideAxesAndRules
-              maxValue={maxValue}
-              initialSpacing={10}
-              endSpacing={10}
-              pointerConfig={undefined}
-            />
-          </View>
-        )}
+      <View>
+        <Svg width={width} height={height}>
+          {/* Axes */}
+          <SvgLine
+            x1={padding}
+            y1={height - padding}
+            x2={width - padding}
+            y2={height - padding}
+            stroke="#bdc3c7"
+            strokeWidth={1}
+          />
+          <SvgLine
+            x1={padding}
+            y1={padding}
+            x2={padding}
+            y2={height - padding}
+            stroke="#bdc3c7"
+            strokeWidth={1}
+          />
 
-        {/* Main line chart with all series */}
-        <LineChart
-          data={currYearData}
-          data2={prevYearData}
-          data3={histAvgData}
-          height={280}
-          width={screenWidth - 64}
-          spacing={Math.max(2, (screenWidth - 64) / maxLen)}
-          thickness={2.5}
-          thickness2={2.5}
-          thickness3={2}
-          color1="#e74c3c"
-          color2="#2c3e50"
-          color3="#2980b9"
-          hideDataPoints={maxLen > 50}
-          dataPointsRadius={4}
-          dataPointsColor1="#e74c3c"
-          dataPointsColor2="#2c3e50"
-          dataPointsColor3="#2980b9"
-          textShiftY={-2}
-          textShiftX={-5}
-          textFontSize={10}
-          curved
-          yAxisColor="#bdc3c7"
-          xAxisColor="#bdc3c7"
-          rulesColor="#ecf0f1"
-          rulesType="solid"
-          yAxisTextStyle={{color: '#7f8c8d', fontSize: 10}}
-          xAxisLabelTextStyle={{color: '#7f8c8d', fontSize: 10}}
-          hideYAxisText={false}
-          initialSpacing={10}
-          endSpacing={10}
-          pointerConfig={{
-            pointer1Color: '#e74c3c',
-            pointer2Color: '#2c3e50',
-            pointer3Color: '#2980b9',
-            activatePointersOnLongPress: true,
-            autoAdjustPointerLabelPosition: true,
-            pointerLabelComponent: (items: any) => {
-              return (
-                <View style={styles.tooltipContainer}>
-                  {items[0] && (
-                    <Text style={[styles.tooltipText, {color: '#e74c3c'}]}>
-                      {currentYear}: {items[0]?.value?.toFixed(0) || '0'}
-                    </Text>
-                  )}
-                  {items[1] && (
-                    <Text style={[styles.tooltipText, {color: '#2c3e50'}]}>
-                      {currentYear - 1}: {items[1]?.value?.toFixed(0) || '0'}
-                    </Text>
-                  )}
-                  {items[2] && (
-                    <Text style={[styles.tooltipText, {color: '#2980b9'}]}>
-                      Hist. avg: {items[2]?.value?.toFixed(0) || '0'}
-                    </Text>
-                  )}
-                </View>
-              );
-            },
-          }}
-          onDataChangeAnimationDuration={300}
-          animateOnDataChange
-          animationDuration={800}
-          maxValue={maxValue}
-          noOfSections={5}
-          yAxisLabelSuffix="k"
-          formatYLabel={(label: string) => `${(parseFloat(label) / 1000).toFixed(0)}k`}
-          dashGap={10}
-          dashWidth={5}
-          isAnimated
-        />
+          {/* Historical 2016–2025 range */}
+          {rangePoints ? (
+            <Polygon
+              points={rangePoints}
+              fill="rgba(135, 206, 250, 0.4)"
+              stroke="none"
+            />
+          ) : null}
+
+          {/* Historical avg */}
+          {histPoints ? (
+            <Polyline
+              points={histPoints}
+              fill="none"
+              stroke="#2980b9"
+              strokeWidth={2}
+            />
+          ) : null}
+
+          {/* Previous year */}
+          {prevPoints ? (
+            <Polyline
+              points={prevPoints}
+              fill="none"
+              stroke="#2c3e50"
+              strokeWidth={2}
+            />
+          ) : null}
+
+          {/* Current year */}
+          {currPoints ? (
+            <Polyline
+              points={currPoints}
+              fill="none"
+              stroke="#e74c3c"
+              strokeWidth={2}
+            />
+          ) : null}
+        </Svg>
 
         <View style={styles.legendRow}>
           <View style={styles.legendItem}>
@@ -375,6 +383,14 @@ const CaoChartsScreen = () => {
             <Text style={styles.legendText}>{currentYear}</Text>
           </View>
         </View>
+
+        <View style={styles.xTicksRow}>
+          {xTicks.map(v => (
+            <Text key={v} style={styles.xTickLabel}>
+              Day {v}
+            </Text>
+          ))}
+        </View>
       </View>
     );
   };
@@ -384,24 +400,24 @@ const CaoChartsScreen = () => {
 
   return (
     <View style={styles.container}>
-      {loading && !rollingData && !demandData ? (
+      {loading && !rollingData ? (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color="#3498db" />
         </View>
       ) : null}
 
-      {error && !loading && !rollingData && !demandData ? (
+      {error && !loading && !rollingData ? (
         <View style={styles.errorContainer}>
           <Text style={styles.errorTitle}>Unable to load CAO charts</Text>
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : (
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}>
           <Text style={styles.title}>7-Day Rolling Averages</Text>
           <Text style={styles.subtitle}>
-            Compare current year, previous year, and long-term average. Long press to see values.
+            Compare current year, previous year, and long-term average.
           </Text>
 
           <ScrollView
@@ -510,8 +526,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
     backgroundColor: '#fff',
     borderRadius: 10,
-    paddingVertical: 16,
-    paddingHorizontal: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.1,
@@ -523,16 +539,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#2c3e50',
     marginLeft: 12,
-    marginBottom: 8,
-  },
-  chartWrapper: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 8,
-  },
-  rangeChartContainer: {
-    position: 'absolute',
-    zIndex: 0,
+    marginBottom: 4,
   },
   emptyContainer: {
     height: 200,
@@ -546,10 +553,9 @@ const styles = StyleSheet.create({
   legendRow: {
     flexDirection: 'row',
     justifyContent: 'flex-start',
-    marginTop: 12,
+    marginTop: 8,
     marginLeft: 8,
     gap: 16,
-    flexWrap: 'wrap',
   },
   legendItem: {
     flexDirection: 'row',
@@ -565,23 +571,15 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#2c3e50',
   },
-  tooltipContainer: {
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    minWidth: 80,
+  xTicksRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 6,
+    marginHorizontal: 12,
   },
-  tooltipText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  tooltipText2: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 2,
+  xTickLabel: {
+    fontSize: 10,
+    color: '#7f8c8d',
   },
 });
 
