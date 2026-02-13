@@ -332,16 +332,21 @@ const CaoChartsScreen = () => {
                 }}
               />
               {/* Historical range area - fill from max down to min */}
-              <Area
-                type="monotone"
-                dataKey="histMax"
-                stroke="none"
-                fill="rgba(135, 206, 250, 0.4)"
-                connectNulls
-                baseLine="histMin"
-                name="2016-2025 Range"
-                hide={hiddenSeries.has('histRange')}
-              />
+              {!hiddenSeries.has('histRange') && (
+                <Area
+                  type="monotone"
+                  dataKey="histMax"
+                  stroke="none"
+                  fill="rgba(135, 206, 250, 0.4)"
+                  connectNulls
+                  baseLine={(entry: any) => {
+                    // entry is the data point, access histMin directly
+                    return entry?.histMin ?? 0;
+                  }}
+                  name="2016-2025 Range"
+                  hide={false}
+                />
+              )}
               <Line
                 type="monotone"
                 dataKey="histAvg"
