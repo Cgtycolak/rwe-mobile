@@ -260,6 +260,24 @@ const CaoChartsScreen = () => {
       };
     });
 
+    // Prepare polygon coordinates for range area (same as web version)
+    // Web version: x.concat(x.slice().reverse()) and max.concat(min.reverse())
+    const validRangeData = chartData.filter((d: any) => d.histMax != null && d.histMin != null);
+    const rangeXValues: number[] = [];
+    const rangeYValues: number[] = [];
+    
+    // Forward: max values
+    validRangeData.forEach((d: any) => {
+      rangeXValues.push(d.day);
+      rangeYValues.push(d.histMax);
+    });
+    
+    // Backward: min values (reversed)
+    validRangeData.slice().reverse().forEach((d: any) => {
+      rangeXValues.push(d.day);
+      rangeYValues.push(d.histMin);
+    });
+
 
     if (useRecharts) {
       return (
@@ -332,22 +350,7 @@ const CaoChartsScreen = () => {
                   );
                 }}
               />
-              {/* Historical range area - use ReferenceArea for each valid data point */}
-              {!hiddenSeries.has('histRange') && chartData
-                .filter((d: any) => d.histMax != null && d.histMin != null && d.histMax > d.histMin)
-                .map((d: any) => (
-                  <ReferenceArea
-                    key={`range-${d.day}`}
-                    x1={d.day}
-                    x2={d.day}
-                    y1={d.histMin}
-                    y2={d.histMax}
-                    fill="rgba(135, 206, 250, 0.4)"
-                    stroke="none"
-                    ifOverflow="extendDomain"
-                  />
-                ))}
-              {/* Always render Area for legend, but hide the actual rendering */}
+              {/* Historical range area - custom polygon shape (same approach as web version) */}
               <Area
                 type="monotone"
                 dataKey="histMax"
@@ -356,7 +359,45 @@ const CaoChartsScreen = () => {
                 connectNulls
                 baseLine={0}
                 name="2016-2025 Range"
-                hide={!hiddenSeries.has('histRange')} // Hide when range is visible (ReferenceArea shows it)
+                hide={hiddenSeries.has('histRange')}
+                shape={(props: any) => {
+                  // Custom shape to draw polygon: max forward + min reversed (same as web)
+                  const {points} = props;
+                  if (!points || points.length === 0 || rangeXValues.length === 0) return null;
+                  
+                  // Get Y-axis scale from props
+                  const yAxis = props.yAxis || {};
+                  const domain = yAxis.domain || [0, 1];
+                  const range = yAxis.range || [0, props.height || 280];
+                  
+                  // Build polygon path: max points forward, then min points reversed
+                  const polygonPoints: string[] = [];
+                  
+                  // Forward: max values (use existing points from histMax)
+                  points.forEach((p: any) => {
+                    polygonPoints.push(`${p.x},${p.y}`);
+                  });
+                  
+                  // Backward: min values (calculate Y positions for histMin)
+                  const reversedValidData = validRangeData.slice().reverse();
+                  reversedValidData.forEach((d: any) => {
+                    // Find corresponding point by day
+                    const maxPoint = points.find((p: any) => p.payload?.day === d.day);
+                    if (maxPoint && d.histMin != null) {
+                      // Calculate Y position for min value
+                      const yRatio = (d.histMin - domain[0]) / (domain[1] - domain[0]);
+                      const minY = range[1] - yRatio * (range[1] - range[0]);
+                      polygonPoints.push(`${maxPoint.x},${minY}`);
+                    }
+                  });
+                  
+                  if (polygonPoints.length < 3) return null;
+                  
+                  // Create closed polygon path
+                  const path = `M ${polygonPoints[0]} L ${polygonPoints.slice(1).join(' L ')} Z`;
+                  
+                  return <path d={path} fill="rgba(135, 206, 250, 0.4)" stroke="none" />;
+                }}
               />
               <Line
                 type="monotone"
