@@ -331,30 +331,20 @@ const CaoChartsScreen = () => {
                   );
                 }}
               />
-              {/* Historical range area - use ReferenceArea segments for proper range fill */}
-              {!hiddenSeries.has('histRange') && chartData
-                .filter((d: any) => d.histMax != null && d.histMin != null && d.histMax > d.histMin)
-                .map((d: any, i: number) => (
-                  <ReferenceArea
-                    key={`range-${i}-${d.day}`}
-                    x1={d.day - 0.5}
-                    x2={d.day + 0.5}
-                    y1={d.histMin}
-                    y2={d.histMax}
-                    fill="rgba(135, 206, 250, 0.4)"
-                    stroke="none"
-                  />
-                ))}
-              {/* Dummy Area component for legend entry - always visible in legend */}
+              {/* Historical range area - Area with baseLine accessing histMin from each data point */}
               <Area
                 type="monotone"
                 dataKey="histMax"
                 stroke="none"
-                fill={hiddenSeries.has('histRange') ? 'transparent' : 'rgba(135, 206, 250, 0.4)'}
+                fill="rgba(135, 206, 250, 0.4)"
                 connectNulls
-                baseLine={0}
+                baseLine={(props: any) => {
+                  // In recharts, baseLine function receives props with payload containing the data point
+                  const dataPoint = props?.payload || props;
+                  return dataPoint?.histMin ?? 0;
+                }}
                 name="2016-2025 Range"
-                hide={false} // Always visible in legend
+                hide={hiddenSeries.has('histRange')}
               />
               <Line
                 type="monotone"
