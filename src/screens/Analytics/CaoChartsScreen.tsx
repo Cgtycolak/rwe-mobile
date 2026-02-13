@@ -331,22 +331,31 @@ const CaoChartsScreen = () => {
                   );
                 }}
               />
-              {/* Historical range area - fill from max down to min */}
-              {!hiddenSeries.has('histRange') && (
-                <Area
-                  type="monotone"
-                  dataKey="histMax"
-                  stroke="none"
-                  fill="rgba(135, 206, 250, 0.4)"
-                  connectNulls
-                  baseLine={(entry: any) => {
-                    // entry is the data point, access histMin directly
-                    return entry?.histMin ?? 0;
-                  }}
-                  name="2016-2025 Range"
-                  hide={false}
-                />
-              )}
+              {/* Historical range area - use ReferenceArea segments for proper range fill */}
+              {!hiddenSeries.has('histRange') && chartData
+                .filter((d: any) => d.histMax != null && d.histMin != null && d.histMax > d.histMin)
+                .map((d: any, i: number) => (
+                  <ReferenceArea
+                    key={`range-${i}-${d.day}`}
+                    x1={d.day - 0.5}
+                    x2={d.day + 0.5}
+                    y1={d.histMin}
+                    y2={d.histMax}
+                    fill="rgba(135, 206, 250, 0.4)"
+                    stroke="none"
+                  />
+                ))}
+              {/* Dummy Area component for legend entry - always visible in legend */}
+              <Area
+                type="monotone"
+                dataKey="histMax"
+                stroke="none"
+                fill={hiddenSeries.has('histRange') ? 'transparent' : 'rgba(135, 206, 250, 0.4)'}
+                connectNulls
+                baseLine={0}
+                name="2016-2025 Range"
+                hide={false} // Always visible in legend
+              />
               <Line
                 type="monotone"
                 dataKey="histAvg"
