@@ -7,9 +7,44 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Platform,
 } from 'react-native';
-import Svg, {Line as SvgLine, Polyline, Polygon} from 'react-native-svg';
 import apiService from '../../services/apiService';
+
+// Conditional import for recharts (web) or fallback to SVG (native)
+let LineChart: any;
+let AreaChart: any;
+let Line: any;
+let Area: any;
+let XAxis: any;
+let YAxis: any;
+let CartesianGrid: any;
+let Tooltip: any;
+let Legend: any;
+let ResponsiveContainer: any;
+let ComposedChart: any;
+
+if (Platform.OS === 'web') {
+  try {
+    const Recharts = require('recharts');
+    LineChart = Recharts.LineChart;
+    AreaChart = Recharts.AreaChart;
+    Line = Recharts.Line;
+    Area = Recharts.Area;
+    XAxis = Recharts.XAxis;
+    YAxis = Recharts.YAxis;
+    CartesianGrid = Recharts.CartesianGrid;
+    Tooltip = Recharts.Tooltip;
+    Legend = Recharts.Legend;
+    ResponsiveContainer = Recharts.ResponsiveContainer;
+    ComposedChart = Recharts.ComposedChart;
+  } catch (e) {
+    console.warn('Recharts not available, using SVG fallback');
+  }
+}
+
+// SVG fallback for native
+import Svg, {Line as SvgLine, Polyline, Polygon} from 'react-native-svg';
 
 type RollingSeries = {
   historical_avg?: number[];
@@ -48,6 +83,7 @@ const CaoChartsScreen = () => {
   const [selectedType, setSelectedType] = useState<string>('naturalgas');
 
   const currentYear = new Date().getFullYear();
+  const screenWidth = Dimensions.get('window').width;
 
   useEffect(() => {
     const load = async () => {
@@ -71,6 +107,8 @@ const CaoChartsScreen = () => {
   }, []);
 
   const renderChart = () => {
+    const useRecharts = Platform.OS === 'web' && LineChart && ResponsiveContainer;
+
     // Special handling for Demand: uses separate endpoint and weekly data
     if (selectedType === 'consumption') {
       if (!demandData || !demandData.consumption) {
@@ -93,110 +131,64 @@ const CaoChartsScreen = () => {
         );
       }
 
-      const width = Dimensions.get('window').width - 48;
-      const height = 220;
-      const padding = 24;
-
-      const allDemandValues = [...prevSeries, ...currSeries].filter(
-        v => typeof v === 'number' && !Number.isNaN(v),
-      ) as number[];
-      const minY = 0;
-      const maxY = Math.max(...allDemandValues);
-      const rangeY = maxY - minY || 1;
       const maxLen = Math.max(prevSeries.length, currSeries.length);
+      const chartData = Array.from({length: maxLen}, (_, i) => ({
+        week: i + 1,
+        prev: prevSeries[i] || null,
+        curr: currSeries[i] || null,
+      }));
 
-      const makePoints = (arr: number[]) => {
-        if (!arr.length) {
-          return '';
-        }
-        return arr
-          .map((y, i) => {
-            const xRatio = maxLen > 1 ? i / (maxLen - 1) : 0;
-            const x = padding + xRatio * (width - padding * 2);
-            const yClamped = Math.max(minY, Math.min(maxY, y));
-            const yRatio = (yClamped - minY) / rangeY;
-            const yCoord = height - padding - yRatio * (height - padding * 2);
-            return `${x},${yCoord}`;
-          })
-          .join(' ');
-      };
-
-      const prevPoints = makePoints(prevSeries);
-      const currPoints = makePoints(currSeries);
-
-      const tickCount = 6;
-      const xStep = Math.max(1, Math.floor(maxLen / (tickCount - 1)));
-      const xTicks = Array.from(
-        {length: tickCount},
-        (_, i) => i * xStep + 1,
-      ).filter(v => v <= maxLen);
-
-      return (
-        <View>
-          <Svg width={width} height={height}>
-            {/* Axes */}
-            <SvgLine
-              x1={padding}
-              y1={height - padding}
-              x2={width - padding}
-              y2={height - padding}
-              stroke="#bdc3c7"
-              strokeWidth={1}
-            />
-            <SvgLine
-              x1={padding}
-              y1={padding}
-              x2={padding}
-              y2={height - padding}
-              stroke="#bdc3c7"
-              strokeWidth={1}
-            />
-
-            {/* Previous year */}
-            {prevPoints ? (
-              <Polyline
-                points={prevPoints}
-                fill="none"
-                stroke="#2c3e50"
-                strokeWidth={2}
-              />
-            ) : null}
-
-            {/* Current year */}
-            {currPoints ? (
-              <Polyline
-                points={currPoints}
-                fill="none"
-                stroke="#e74c3c"
-                strokeWidth={2}
-              />
-            ) : null}
-          </Svg>
-
-          <View style={styles.legendRow}>
-            <View style={styles.legendItem}>
-              <View
-                style={[styles.legendSwatch, {backgroundColor: '#2c3e50'}]}
-              />
-              <Text style={styles.legendText}>{currentYear - 1}</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View
-                style={[styles.legendSwatch, {backgroundColor: '#e74c3c'}]}
-              />
-              <Text style={styles.legendText}>{currentYear}</Text>
-            </View>
+      if (useRecharts) {
+        return (
+          <View style={styles.chartWrapper}>
+            <ResponsiveContainer width="100%" height={280}>
+              <ComposedChart data={chartData} margin={{top: 5, right: 10, left: 0, bottom: 5}}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
+                <XAxis
+                  dataKey="week"
+                  tick={{fill: '#7f8c8d', fontSize: 10}}
+                  label={{value: 'Week', position: 'insideBottom', offset: -5, fill: '#7f8c8d'}}
+                />
+                <YAxis
+                  tick={{fill: '#7f8c8d', fontSize: 10}}
+                  label={{value: 'MWh', angle: -90, position: 'insideLeft', fill: '#7f8c8d'}}
+                  tickFormatter={(value: number) => `${(value / 1000).toFixed(0)}k`}
+                />
+                <Tooltip
+                  contentStyle={{backgroundColor: 'rgba(0,0,0,0.8)', border: 'none', borderRadius: 4}}
+                  labelStyle={{color: '#fff'}}
+                  formatter={(value: number) => [`${value?.toFixed(0) || 0} MWh`, '']}
+                />
+                <Legend
+                  wrapperStyle={{paddingTop: 10}}
+                  iconType="line"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="prev"
+                  stroke="#2c3e50"
+                  strokeWidth={2.5}
+                  name={`${currentYear - 1}`}
+                  dot={false}
+                  activeDot={{r: 6}}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="curr"
+                  stroke="#e74c3c"
+                  strokeWidth={2.5}
+                  name={`${currentYear}`}
+                  dot={false}
+                  activeDot={{r: 6}}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
           </View>
+        );
+      }
 
-          <View style={styles.xTicksRow}>
-            {xTicks.map(v => (
-              <Text key={v} style={styles.xTickLabel}>
-                Week {v}
-              </Text>
-            ))}
-          </View>
-        </View>
-      );
+      // SVG fallback for native
+      return renderDemandSVG(prevSeries, currSeries, maxLen);
     }
 
     // Other fuel types: use rollingData with historical band
@@ -218,157 +210,233 @@ const CaoChartsScreen = () => {
     const prevYearSeries = series[String(currentYear - 1)] || [];
     const currYearSeries = series[String(currentYear)] || [];
 
-    const allValues = [
-      ...histAvg,
-      ...histRange.map(r => (r.max != null ? r.max : r.min ?? 0)),
-      ...histRange.map(r => (r.min != null ? r.min : r.max ?? 0)),
-      ...prevYearSeries,
-      ...currYearSeries,
-    ].filter(
-      v => typeof v === 'number' && !Number.isNaN(v),
-    ) as number[];
-
-    if (allValues.length === 0) {
-      return (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No data available for this series.</Text>
-        </View>
-      );
-    }
-
     const maxLen = Math.max(
       histAvg.length,
       histRange.length,
       prevYearSeries.length,
       currYearSeries.length,
     );
-    const width = Dimensions.get('window').width - 48;
+
+    const chartData = Array.from({length: maxLen}, (_, i) => ({
+      day: i + 1,
+      histAvg: histAvg[i] || null,
+      histMax: histRange[i]?.max || null,
+      histMin: histRange[i]?.min || null,
+      prev: prevYearSeries[i] || null,
+      curr: currYearSeries[i] || null,
+    }));
+
+    if (useRecharts) {
+      return (
+        <View style={styles.chartWrapper}>
+          <ResponsiveContainer width="100%" height={280}>
+            <ComposedChart data={chartData} margin={{top: 5, right: 10, left: 0, bottom: 5}}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
+              <XAxis
+                dataKey="day"
+                tick={{fill: '#7f8c8d', fontSize: 10}}
+                label={{value: 'Day', position: 'insideBottom', offset: -5, fill: '#7f8c8d'}}
+                interval="preserveStartEnd"
+              />
+              <YAxis
+                tick={{fill: '#7f8c8d', fontSize: 10}}
+                label={{value: 'mW', angle: -90, position: 'insideLeft', fill: '#7f8c8d'}}
+                tickFormatter={(value: number) => `${(value / 1000).toFixed(0)}k`}
+              />
+              <Tooltip
+                contentStyle={{backgroundColor: 'rgba(0,0,0,0.8)', border: 'none', borderRadius: 4}}
+                labelStyle={{color: '#fff'}}
+                formatter={(value: number, name: string) => {
+                  const labels: {[key: string]: string} = {
+                    histAvg: 'Hist. avg',
+                    prev: `${currentYear - 1}`,
+                    curr: `${currentYear}`,
+                  };
+                  return [`${value?.toFixed(0) || 0}`, labels[name] || name];
+                }}
+              />
+              <Legend
+                wrapperStyle={{paddingTop: 10}}
+                iconType="line"
+              />
+              {/* Historical range area */}
+              <Area
+                type="monotone"
+                dataKey="histMax"
+                stroke="none"
+                fill="rgba(135, 206, 250, 0.4)"
+                connectNulls
+              />
+              <Area
+                type="monotone"
+                dataKey="histMin"
+                stroke="none"
+                fill="rgba(135, 206, 250, 0.4)"
+                connectNulls
+              />
+              <Line
+                type="monotone"
+                dataKey="histAvg"
+                stroke="#2980b9"
+                strokeWidth={2}
+                strokeDasharray="5 5"
+                name="Hist. avg"
+                dot={false}
+                activeDot={{r: 6}}
+              />
+              <Line
+                type="monotone"
+                dataKey="prev"
+                stroke="#2c3e50"
+                strokeWidth={2.5}
+                name={`${currentYear - 1}`}
+                dot={false}
+                activeDot={{r: 6}}
+              />
+              <Line
+                type="monotone"
+                dataKey="curr"
+                stroke="#e74c3c"
+                strokeWidth={2.5}
+                name={`${currentYear}`}
+                dot={false}
+                activeDot={{r: 6}}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </View>
+      );
+    }
+
+    // SVG fallback for native
+    return renderRollingSVG(series, histAvg, histRange, prevYearSeries, currYearSeries, maxLen);
+  };
+
+  // SVG fallback renderers
+  const renderDemandSVG = (prevSeries: number[], currSeries: number[], maxLen: number) => {
+    const width = screenWidth - 48;
     const height = 220;
     const padding = 24;
-    const minY = 0;
+    const allValues = [...prevSeries, ...currSeries].filter(v => typeof v === 'number' && !Number.isNaN(v));
     const maxY = Math.max(...allValues);
-    const rangeY = maxY - minY || 1;
+    const rangeY = maxY || 1;
 
     const makePoints = (arr: number[]) => {
-      if (!arr.length) {
-        return '';
-      }
+      if (!arr.length) return '';
       return arr
         .map((y, i) => {
           const xRatio = maxLen > 1 ? i / (maxLen - 1) : 0;
           const x = padding + xRatio * (width - padding * 2);
-          const yClamped = Math.max(minY, Math.min(maxY, y));
-          const yRatio = (yClamped - minY) / rangeY;
+          const yRatio = y / rangeY;
           const yCoord = height - padding - yRatio * (height - padding * 2);
           return `${x},${yCoord}`;
         })
         .join(' ');
     };
 
-    const histPoints = makePoints(histAvg);
-    const prevPoints = makePoints(prevYearSeries);
-    const currPoints = makePoints(currYearSeries);
+    const prevPoints = makePoints(prevSeries);
+    const currPoints = makePoints(currSeries);
+    const tickCount = 6;
+    const xStep = Math.max(1, Math.floor(maxLen / (tickCount - 1)));
+    const xTicks = Array.from({length: tickCount}, (_, i) => i * xStep + 1).filter(v => v <= maxLen);
 
-    // Historical range polygon (2016–2025 band)
+    return (
+      <View>
+        <Svg width={width} height={height}>
+          <SvgLine x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#bdc3c7" strokeWidth={1} />
+          <SvgLine x1={padding} y1={padding} x2={padding} y2={height - padding} stroke="#bdc3c7" strokeWidth={1} />
+          {prevPoints ? <Polyline points={prevPoints} fill="none" stroke="#2c3e50" strokeWidth={2} /> : null}
+          {currPoints ? <Polyline points={currPoints} fill="none" stroke="#e74c3c" strokeWidth={2} /> : null}
+        </Svg>
+        <View style={styles.legendRow}>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendSwatch, {backgroundColor: '#2c3e50'}]} />
+            <Text style={styles.legendText}>{currentYear - 1}</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendSwatch, {backgroundColor: '#e74c3c'}]} />
+            <Text style={styles.legendText}>{currentYear}</Text>
+          </View>
+        </View>
+        <View style={styles.xTicksRow}>
+          {xTicks.map(v => (
+            <Text key={v} style={styles.xTickLabel}>Week {v}</Text>
+          ))}
+        </View>
+      </View>
+    );
+  };
+
+  const renderRollingSVG = (
+    series: RollingSeries,
+    histAvg: number[],
+    histRange: {min: number | null; max: number | null}[],
+    prevYearSeries: number[],
+    currYearSeries: number[],
+    maxLen: number,
+  ) => {
+    const width = screenWidth - 48;
+    const height = 220;
+    const padding = 24;
+    const allValues = [
+      ...histAvg,
+      ...histRange.map(r => (r.max != null ? r.max : r.min ?? 0)),
+      ...histRange.map(r => (r.min != null ? r.min : r.max ?? 0)),
+      ...prevYearSeries,
+      ...currYearSeries,
+    ].filter(v => typeof v === 'number' && !Number.isNaN(v));
+    const maxY = Math.max(...allValues);
+    const rangeY = maxY || 1;
+
+    const makePoints = (arr: number[]) => {
+      if (!arr.length) return '';
+      return arr
+        .map((y, i) => {
+          const xRatio = maxLen > 1 ? i / (maxLen - 1) : 0;
+          const x = padding + xRatio * (width - padding * 2);
+          const yRatio = y / rangeY;
+          const yCoord = height - padding - yRatio * (height - padding * 2);
+          return `${x},${yCoord}`;
+        })
+        .join(' ');
+    };
+
     let rangePoints = '';
     if (histRange.length) {
       const maxPts: string[] = [];
       const minPts: string[] = [];
-
       histRange.forEach((r, i) => {
         const maxVal = r.max != null ? r.max : r.min ?? 0;
         const minVal = r.min != null ? r.min : r.max ?? 0;
         const xRatio = maxLen > 1 ? i / (maxLen - 1) : 0;
         const x = padding + xRatio * (width - padding * 2);
-
-        const clamp = (yVal: number) =>
-          Math.max(minY, Math.min(maxY, yVal || 0));
-
-        const maxClamped = clamp(maxVal);
-        const minClamped = clamp(minVal);
-
-        const maxRatio = (maxClamped - minY) / rangeY;
-        const minRatio = (minClamped - minY) / rangeY;
-        const yMaxCoord =
-          height - padding - maxRatio * (height - padding * 2);
-        const yMinCoord =
-          height - padding - minRatio * (height - padding * 2);
-
+        const maxRatio = maxVal / rangeY;
+        const minRatio = minVal / rangeY;
+        const yMaxCoord = height - padding - maxRatio * (height - padding * 2);
+        const yMinCoord = height - padding - minRatio * (height - padding * 2);
         maxPts.push(`${x},${yMaxCoord}`);
         minPts.push(`${x},${yMinCoord}`);
       });
-
       rangePoints = [...maxPts, ...minPts.reverse()].join(' ');
     }
 
-    // Simple x-axis ticks: 6 evenly spaced labels
+    const histPoints = makePoints(histAvg);
+    const prevPoints = makePoints(prevYearSeries);
+    const currPoints = makePoints(currYearSeries);
     const tickCount = 6;
     const xStep = Math.max(1, Math.floor(maxLen / (tickCount - 1)));
-    const xTicks = Array.from({length: tickCount}, (_, i) => i * xStep + 1).filter(
-      v => v <= maxLen,
-    );
+    const xTicks = Array.from({length: tickCount}, (_, i) => i * xStep + 1).filter(v => v <= maxLen);
 
     return (
       <View>
         <Svg width={width} height={height}>
-          {/* Axes */}
-          <SvgLine
-            x1={padding}
-            y1={height - padding}
-            x2={width - padding}
-            y2={height - padding}
-            stroke="#bdc3c7"
-            strokeWidth={1}
-          />
-          <SvgLine
-            x1={padding}
-            y1={padding}
-            x2={padding}
-            y2={height - padding}
-            stroke="#bdc3c7"
-            strokeWidth={1}
-          />
-
-          {/* Historical 2016–2025 range */}
-          {rangePoints ? (
-            <Polygon
-              points={rangePoints}
-              fill="rgba(135, 206, 250, 0.4)"
-              stroke="none"
-            />
-          ) : null}
-
-          {/* Historical avg */}
-          {histPoints ? (
-            <Polyline
-              points={histPoints}
-              fill="none"
-              stroke="#2980b9"
-              strokeWidth={2}
-            />
-          ) : null}
-
-          {/* Previous year */}
-          {prevPoints ? (
-            <Polyline
-              points={prevPoints}
-              fill="none"
-              stroke="#2c3e50"
-              strokeWidth={2}
-            />
-          ) : null}
-
-          {/* Current year */}
-          {currPoints ? (
-            <Polyline
-              points={currPoints}
-              fill="none"
-              stroke="#e74c3c"
-              strokeWidth={2}
-            />
-          ) : null}
+          <SvgLine x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#bdc3c7" strokeWidth={1} />
+          <SvgLine x1={padding} y1={padding} x2={padding} y2={height - padding} stroke="#bdc3c7" strokeWidth={1} />
+          {rangePoints ? <Polygon points={rangePoints} fill="rgba(135, 206, 250, 0.4)" stroke="none" /> : null}
+          {histPoints ? <Polyline points={histPoints} fill="none" stroke="#2980b9" strokeWidth={2} /> : null}
+          {prevPoints ? <Polyline points={prevPoints} fill="none" stroke="#2c3e50" strokeWidth={2} /> : null}
+          {currPoints ? <Polyline points={currPoints} fill="none" stroke="#e74c3c" strokeWidth={2} /> : null}
         </Svg>
-
         <View style={styles.legendRow}>
           <View style={styles.legendItem}>
             <View style={[styles.legendSwatch, {backgroundColor: '#2980b9'}]} />
@@ -383,12 +451,9 @@ const CaoChartsScreen = () => {
             <Text style={styles.legendText}>{currentYear}</Text>
           </View>
         </View>
-
         <View style={styles.xTicksRow}>
           {xTicks.map(v => (
-            <Text key={v} style={styles.xTickLabel}>
-              Day {v}
-            </Text>
+            <Text key={v} style={styles.xTickLabel}>Day {v}</Text>
           ))}
         </View>
       </View>
@@ -400,13 +465,13 @@ const CaoChartsScreen = () => {
 
   return (
     <View style={styles.container}>
-      {loading && !rollingData ? (
+      {loading && !rollingData && !demandData ? (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color="#3498db" />
         </View>
       ) : null}
 
-      {error && !loading && !rollingData ? (
+      {error && !loading && !rollingData && !demandData ? (
         <View style={styles.errorContainer}>
           <Text style={styles.errorTitle}>Unable to load CAO charts</Text>
           <Text style={styles.errorText}>{error}</Text>
@@ -417,7 +482,9 @@ const CaoChartsScreen = () => {
           showsVerticalScrollIndicator={false}>
           <Text style={styles.title}>7-Day Rolling Averages</Text>
           <Text style={styles.subtitle}>
-            Compare current year, previous year, and long-term average.
+            {Platform.OS === 'web' 
+              ? 'Compare current year, previous year, and long-term average. Hover or click to see values. Zoom with mouse wheel.'
+              : 'Compare current year, previous year, and long-term average.'}
           </Text>
 
           <ScrollView
@@ -526,8 +593,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
     backgroundColor: '#fff',
     borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.1,
@@ -539,7 +606,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#2c3e50',
     marginLeft: 12,
-    marginBottom: 4,
+    marginBottom: 8,
+  },
+  chartWrapper: {
+    width: '100%',
+    height: 280,
+    marginVertical: 8,
   },
   emptyContainer: {
     height: 200,
@@ -553,9 +625,10 @@ const styles = StyleSheet.create({
   legendRow: {
     flexDirection: 'row',
     justifyContent: 'flex-start',
-    marginTop: 8,
+    marginTop: 12,
     marginLeft: 8,
     gap: 16,
+    flexWrap: 'wrap',
   },
   legendItem: {
     flexDirection: 'row',
