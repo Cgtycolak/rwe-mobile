@@ -10,26 +10,65 @@ import {
   Modal,
 } from 'react-native';
 import apiService from '../../services/apiService';
-import {format, subDays} from 'date-fns';
+import {format, subDays, addDays} from 'date-fns';
+
+// Helper function to get default date: tomorrow if after 16:10, otherwise today
+const getDefaultDate = (): string => {
+  const now = new Date();
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
+  
+  // If time is after 16:10 (4:10 PM), use tomorrow
+  if (hours > 16 || (hours === 16 && minutes >= 10)) {
+    return format(addDays(now, 1), 'yyyy-MM-dd');
+  }
+  
+  return format(now, 'yyyy-MM-dd');
+};
 
 const ImportCoalHeatmapScreen = () => {
   // Import Coal with DPP only (no realtime)
   const [loading, setLoading] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(
-    format(new Date(), 'yyyy-MM-dd'),
-  );
+  const [selectedDate, setSelectedDate] = useState(getDefaultDate());
   const [version, setVersion] = useState<'first' | 'current'>('current');
   const [heatmapData, setHeatmapData] = useState<any>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  // Generate date options (today + last 180 days = ~6 months)
-  const dateOptions = Array.from({length: 181}, (_, i) => {
-    const date = subDays(new Date(), i);
-    return {
-      value: format(date, 'yyyy-MM-dd'),
-      label: i === 0 ? `${format(date, 'yyyy-MM-dd')} (Today)` : format(date, 'yyyy-MM-dd'),
-    };
-  });
+  // Generate date options - include tomorrow if after 16:10
+  const now = new Date();
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
+  const isAfter1610 = hours > 16 || (hours === 16 && minutes >= 10);
+  
+  const dateOptions = (() => {
+    const options: Array<{value: string; label: string}> = [];
+    
+    // Add tomorrow first if after 16:10
+    if (isAfter1610) {
+      const tomorrow = addDays(now, 1);
+      options.push({
+        value: format(tomorrow, 'yyyy-MM-dd'),
+        label: `${format(tomorrow, 'yyyy-MM-dd')} (Tomorrow)`,
+      });
+    }
+    
+    // Add today
+    options.push({
+      value: format(now, 'yyyy-MM-dd'),
+      label: `${format(now, 'yyyy-MM-dd')} (Today)`,
+    });
+    
+    // Add past 180 days
+    for (let i = 1; i <= 180; i++) {
+      const date = subDays(now, i);
+      options.push({
+        value: format(date, 'yyyy-MM-dd'),
+        label: format(date, 'yyyy-MM-dd'),
+      });
+    }
+    
+    return options;
+  })();
 
   useEffect(() => {
     loadHeatmapData();
